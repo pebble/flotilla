@@ -1,0 +1,1 @@
+from .dynamodb import DynamoDbFlotillaStorage

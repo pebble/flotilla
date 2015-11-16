@@ -1,0 +1,315 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Minimal template to demo flotilla",
+  "Parameters": {
+    "ServiceName": {
+      "Type": "String",
+      "Default": "testapp",
+      "Description": "Name of service"
+    }
+  },
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "192.168.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+      }
+    },
+    "AttachGateway": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "PublicSubnet01": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.0.0/24",
+        "AvailabilityZone": "us-east-1a"
+      }
+    },
+    "PublicRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"}
+      }
+    },
+    "PublicRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PublicRouteTable"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {"Ref": "InternetGateway"}
+      }
+    },
+    "PublicSubnet01RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PublicSubnet01"},
+        "RouteTableId": {"Ref": "PublicRouteTable"}
+      }
+    },
+    "WorkerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security Group",
+        "VpcId": {"Ref": "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "SourceSecurityGroupId": {"Ref": "ElbSecurityGroup"}
+          }
+        ]
+      }
+    },
+    "ElbSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security Group",
+        "VpcId": {"Ref": "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "WorkerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["ec2.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DescribeEC2Autoscaling",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:Describe*",
+                    "autoscaling:Describe*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "FlotillaDynamo",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:*"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:us-east-1",
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-*"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "ElbRegistration",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticloadbalancing:DescribeInstanceHealth"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                    "elasticloadbalancing:RegisterInstancesWithLoadBalancer"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:elasticloadbalancing:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":loadbalancer/",
+                        {"Ref": "Elb"}
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/"
+      }
+    },
+    "WorkerInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {"Ref": "WorkerRole"}
+        ]
+      }
+    },
+    "WorkerLC": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "InstanceType": "t2.micro",
+        "ImageId": "ami-37bdc15d",
+        "SecurityGroups": [{"Ref": "WorkerSecurityGroup"}],
+        "AssociatePublicIpAddress": "true",
+        "IamInstanceProfile": {"Ref": "WorkerInstanceProfile"},
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "", [
+                "#cloud-config", "\n",
+                "\n",
+                "write_files:", "\n",
+                "  - path: /home/core/.dockercfg", "\n",
+                "    permissions: 0644", "\n",
+                "    owner: core", "\n",
+                "    content: |", "\n",
+                "      {\"https://index.docker.io/v1/\": {\"auth\":\"TODO: no password for you\",\"email\": \"docker@mycloudand.me\"}}",
+                "\n",
+                "\n",
+                "coreos:", "\n",
+                "  units:", "\n",
+                "    - name: flotilla.service", "\n",
+                "      command: start", "\n",
+                "      content: |", "\n",
+                "        [Unit]", "\n",
+                "        Description=Flotilla agent", "\n",
+                "        ", "\n",
+                "        [Service]", "\n",
+                "        User=core", "\n",
+                "        ExecStartPre=-/usr/bin/docker kill flotilla",  "\n",
+                "        ExecStartPre=-/usr/bin/docker rm flotilla", "\n",
+                "        ExecStartPre=-/usr/bin/docker pull pwagner/flotilla",
+                "\n",
+                "        ExecStart=/usr/bin/docker run --name flotilla",
+                " -e FLOTILLA_SERVICE=", {"Ref": "ServiceName"},
+                " -e FLOTILLA_LB=", {"Ref": "Elb"},
+                " -e FLOTILLA_LB_REGION=", {"Ref": "AWS::Region"},
+                " -v /run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket",
+                " -v /etc/systemd/system:/etc/systemd/system",
+                " -v /etc/flotilla:/etc/flotilla",
+                " pwagner/flotilla", "\n",
+                "        ExecStop=/usr/bin/docker stop flotilla",
+                "\n",
+                "\n",
+                "users:", "\n",
+                "  - name: core", "\n",
+                "    ssh-authorized-keys:", "\n",
+                "      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDeaQWX1gvmJPKChpAET2ea688JudDtsn77XqvzcLf3na45Ri1RZA469vwxLpZ1y0VeQxNz74s0qh4+ZUuvO8u2ygkodgU0ZpeHVetXmd11Ct4JHhRicvXlDs07uyQPcl1QJaCbAzC89iBetuR+QJps3pE82sqjeL5uniZMoWFpzT3uicc7+bLepF6PY+PYYWWPRu6wjV876lFKZqABP7hzH7TJAMOa0tMRLcQRFLOUgMWHr3Hbw52VQWszGvhseA3uAUEJ1IEXkY10dSqvZkCykv2sjoGK7nSQqZTBx5B6rvuQoVIytI3VUrVbSMGJjStmGYV2RdFBrpmENJYAfRoG4bhkYBrt42UInNUwj84VLMVl0r/YbSAzFGzZzUvj2b2Dgz6lS4N4U4KFXQZlCGwlgFr+oR74La0c+pI+kwsYA9uV1a0eWiJig9V/6HLVY5P7mMCsVihqH2EjpZQDod03RlSBFqUv3Uf/7odT6bjewShTbDHs3isFyg4VAoZo4p1awKgmjTzGJDzrWlBdsBbJZlXVClIDhlOGkDRxrNeBoPJ4wywvXCtiwK2MRB7/Qq4j84p431V4N0rEsQa6kQXSyyOWoB/j4h92ZjEIYgKWMXjGkIi4Uj0njRA6zwur2n4F3fqrwvJaCXvXPE9Zjkq2d/aq7AxVuMpy7iLQonKrEQ==",
+                "\n",
+                "\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "WorkerASG": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "MinSize": 2,
+        "MaxSize": 2,
+        "DesiredCapacity": 2,
+        "LoadBalancerNames": [
+          {"Ref": "Elb"}
+        ],
+        "LaunchConfigurationName": {"Ref": "WorkerLC"},
+        "VPCZoneIdentifier": [
+          {"Ref": "PublicSubnet01"}
+        ]
+      }
+    },
+    "Elb": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+        "Scheme": "internet-facing",
+        "Subnets": [
+          {"Ref": "PublicSubnet01"}
+        ],
+        "HealthCheck": {
+          "HealthyThreshold": "2",
+          "Interval": "5",
+          "Target": "TCP:80",
+          "Timeout": "3",
+          "UnhealthyThreshold": "4"
+        },
+        "SecurityGroups": [
+          {"Ref": "ElbSecurityGroup"}
+        ],
+        "Listeners": [
+          {
+            "InstancePort": "80",
+            "LoadBalancerPort": "80",
+            "Protocol": "HTTP",
+            "InstanceProtocol": "HTTP"
+          }
+        ],
+        "CrossZone": "true",
+        "ConnectionDrainingPolicy": {
+          "Enabled": true,
+          "Timeout": 60
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "WorkerASG": {
+      "Value": {"Ref": "WorkerASG"}
+    },
+    "ElbAddress": {
+      "Value": {"Fn::GetAtt": ["Elb", "DNSName"]}
+    }
+  }
+}
