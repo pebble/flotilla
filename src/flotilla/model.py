@@ -2,17 +2,16 @@ import hashlib
 import os
 import time
 
+UNIT_PREFIX = 'flotilla-'
+
 
 class FlotillaUnit(object):
-    """Systemd unit file and configuration (environment variables)"""
+    """Systemd unit file and configuration (environment variables)."""
 
     def __init__(self, name, unit_file, environment={}):
         self.name = name
         self.unit_file = unit_file
-        if environment:
-            self.environment = environment
-        else:
-            self.environment = {}
+        self.environment = environment or {}
 
     def __str__(self):
         return 'Unit: %s' % self.name
@@ -30,15 +29,17 @@ class FlotillaUnit(object):
     @property
     def full_name(self):
         name, ext = os.path.splitext(self.name)
-        return 'barco-%s-%s%s' % (name, self.unit_hash, ext)
+        return '%s%s-%s%s' % (UNIT_PREFIX, name, self.unit_hash, ext)
 
 
 class FlotillaDockerService(FlotillaUnit):
+    """Specialized unit file for running a docker service."""
+
     def __init__(self, name, image, ports={}, environment={}):
         ports_flag = ''
         if ports:
             ports_flag = ' -p ' + ' -p '.join(['%s:%s' % (k, v)
-                                              for k, v in ports.items()])
+                                               for k, v in ports.items()])
         environment_flag = ''
         if environment:
             environment_flag = " --env-file /etc/flotilla/%n"
@@ -63,19 +64,20 @@ ExecStop=/usr/bin/docker stop %n
 class FlotillaServiceRevision(object):
     """Weighted collection of units to be deployed together."""
 
-    def __init__(self, label=None, weight=1, units=[]):
+    def __init__(self, label=None, weight=1, units=None):
         self.label = label or 'rev-%d' % time.time()
         self.weight = weight
-        self.units = units
+        self.units = units or []
 
-
-class FlotillaService(object):
-    """Collection of weighted revisions of units."""
-
-    def __init__(self, name, units=[]):
-        self._name = name
-        self._units = units
+    def __repr__(self):
+        return 'Revision %s (%d): %d units' % (
+            self.label, self.weight, len(self.units))
 
     @property
-    def name(self):
-        return self._name
+    def revision_hash(self):
+        revision_hash = hashlib.sha256()
+        revision_hash.update(self.label)
+        unit_hashes = [u.unit_hash for u in self.units]
+        for unit_hash in sorted(unit_hashes):
+            revision_hash.update(unit_hash)
+        return revision_hash.hexdigest()

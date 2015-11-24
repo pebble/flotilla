@@ -18,7 +18,7 @@ class DynamoDbFlotillaStorage(object):
             HashKey('service_name')
         ], 1, 1)
         self._revisions = self._table('flotilla-service-revisions', [
-            HashKey('label')
+            HashKey('rev_hash')
         ], 1, 1)
         self._units = self._table('flotilla-units', [
             HashKey('unit_hash')
@@ -30,10 +30,10 @@ class DynamoDbFlotillaStorage(object):
         self._status = self._table('flotilla-status', [
             HashKey('instance_id')
         ], 1, 1)
-
         self._locks = self._table('flotilla-locks', [
             HashKey('lock_name')
         ], 1, 1)
+        # TODO: block until tables complete?
 
     def _table(self, name, schema, read, write):
         table = Table(name, connection=self._dynamo)
@@ -114,67 +114,8 @@ class DynamoDbFlotillaStorage(object):
             services[name] = rev_weights
         return services
 
-    def heartbeat(self, service):
-        logger.debug('Storing heartbeat for %s as %s', service, self._id)
-        now = time.time()
-        try:
-            assignment_item = self._assignments.get_item(service_name=service,
-                                                         instance_id=self._id)
-            assignment_item['heartbeat'] = now
-            assignment_item.partial_save()
-        except ItemNotFound:
-            self._assignments.put_item(data={
-                'service_name': service,
-                'instance_id': self._id,
-                'heartbeat': now
-            })
-        logger.debug('Stored heartbeat for %s as %s', service, self._id)
 
-    def get_units(self, service):
-        units = []
 
-        assignment_item = self._assignments.get_item(service_name=service,
-                                                     instance_id=self._id)
-        assigned_revision = assignment_item['assignment']
-        if assigned_revision:
-            revision_item = self._revisions.get_item(label=assigned_revision)
-            unit_items = self._units.batch_get(keys=[
-                {'unit_hash': unit for unit in revision_item['units']}
-            ])
-            for unit_item in unit_items:
-                units.append(FlotillaUnit(unit_item['name'],
-                                          unit_item['unit_file'],
-                                          unit_item['environment']))
-
-                # Select global services
-                # Select services that are assigned to the instance
-        return units
-
-    def store_status(self, unit_status):
-        logger.debug('Storing status as %s.', self._id)
-        data = {name: json.dumps(status)
-                for name, status in unit_status.items()}
-        data['instance_id'] = self._id
-        data['status_time'] = time.time()
-        item = self._status.put_item(data=data, overwrite=True)
-        logger.debug('Stored status as %s.', self._id)
-
-    def get_assignments(self, service):
-        """Get instances and assigned revisions for a service.
-        :param service:  Service name.
-        :return: Dict of instance id to assigned revision.
-        """
-        return {a['instance_id']: a
-                for a in self._assignments.query_2(service_name__eq=service)}
-
-    def get_assignment(self, service):
-        try:
-            assignment = self._assignments.get_item(service_name=service,
-                                                    instance_id=self._id)
-            return assignment['assignment']
-        except ItemNotFound:
-            pass
-        return None
 
     def set_assignment(self, service, machine, assignment):
         self._assignments.put_item(data={
@@ -191,55 +132,3 @@ class DynamoDbFlotillaStorage(object):
             for assignment in assignments:
                 batch.put_item(assignment)
 
-    def try_lock(self, name, ttl=60, refresh=False):
-        acquire_time = time.time()
-        try:
-            lock_item = self._locks.get_item(lock_name=name, consistent=True)
-        except ItemNotFound:
-            logger.debug('Lock %s not found, creating.', name)
-            try:
-                self._locks.put_item({
-                    'lock_name': name,
-                    'acquire_time': acquire_time,
-                    'owner': self._id,
-                })
-                return True
-            except Exception as e:
-                logger.exception(e)
-                return False
-
-        # Lock found, check ttl:
-        acquired_time = float(lock_item['acquire_time'])
-        if (acquire_time - acquired_time) > ttl:
-            logger.debug('Lock %s has expired, attempting to acquire.', name)
-            lock_item['owner'] = self._id
-            lock_item['acquire_time'] = acquire_time
-            try:
-                lock_item.save()
-                logger.debug('Acquired expired lock %s.', name)
-                return True
-            except ConditionalCheckFailedException:
-                logger.debug('Did not acquire expired lock %s.', name)
-                return False
-
-        owner = lock_item['owner']
-        if owner == self._id:
-            logger.debug('Lock %s is held by me (since %s).', name,
-                         acquired_time)
-            if refresh:
-                lock_item['acquire_time'] = acquire_time;
-                lock_item.save()
-
-            return True
-        else:
-            logger.debug('Lock %s is held by %s (since %s).', name, owner,
-                         acquired_time)
-            return False
-
-    def release_lock(self, name):
-        try:
-            lock_item = self._locks.get_item(lock_name=name, consistent=True)
-            if lock_item['owner'] == self._id:
-                lock_item.delete()
-        except Exception as e:
-            logger.exception(e)

@@ -1,1 +1,2 @@
-from .dynamodb import DynamoDbFlotillaStorage
+from .tables import DynamoDbTables
+from .lock import DynamoDbLocks

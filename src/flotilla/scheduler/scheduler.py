@@ -6,8 +6,8 @@ logger = logging.getLogger('flotilla')
 
 
 class FlotillaScheduler(object):
-    def __init__(self, dynamo):
-        self._dynamo = dynamo
+    def __init__(self, db):
+        self._db = db
         self.active = False
 
     def loop(self):
@@ -17,15 +17,15 @@ class FlotillaScheduler(object):
         loop_start = time.time()
         logger.debug('Starting scheduler loop.')
 
-        service_weights = self._dynamo.get_revision_weights()
+        service_weights = self._db.get_revision_weights()
         service_count = len(service_weights)
-        logger.debug('Found %d services to balance assignments.', service_count)
         for service, revisions in service_weights.items():
             logger.debug('Balancing assignments: %s (%s revisions).', service,
                          len(revisions))
 
             # Get all instances in the service (assigned or not):
-            assignments = self._dynamo.get_assignments(service)
+            assignments = self._db.get_instance_assignments(service)
+            print assignments
             instance_count = len(assignments)
             if not assignments:
                 logger.debug('No instances, can not assign %s.', service)
@@ -81,7 +81,7 @@ class FlotillaScheduler(object):
             # Store assignment updates:
             if reassigned and self.active:
                 logger.debug('Storing %d reassignments.', len(reassigned))
-                self._dynamo.set_assignments(reassigned)
+                self._db.set_assignments(reassigned)
 
         # TODO: publish as custom CW metric
         loop_time = time.time() - loop_start

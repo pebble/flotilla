@@ -1,19 +1,20 @@
 import logging
 import os
+from flotilla.model import UNIT_PREFIX
 
 logger = logging.getLogger('flotilla')
 
 
 class SystemdUnits(object):
-    def __init__(self, manager, service_dir='/etc/systemd/system',
+    def __init__(self, manager, unit_dir='/etc/systemd/system',
                  env_dir='/etc/flotilla'):
         self._manager = manager
-        self._service_dir = service_dir
+        self._unit_dir = unit_dir
         self._env_dir = env_dir
 
     def get_units(self):
         units = [unit for unit in self._manager.list_units() if
-                 unit.properties.Id.startswith('barco-')]
+                 unit.properties.Id.startswith(UNIT_PREFIX)]
         logger.debug('Found %s units.', len(units))
         return units
 
@@ -46,30 +47,36 @@ class SystemdUnits(object):
                     existing_unit.stop('replace')
                 except Exception as e:
                     logger.exception(e)
-                unit_path = os.path.join(self._service_dir, name)
+                unit_path = os.path.join(self._unit_dir, name)
                 if os.path.isfile(unit_path):
                     os.unlink(unit_path)
+                env_path = os.path.join(self._env_dir, name)
+                if os.path.isfile(env_path):
+                    os.unlink(env_path)
+
 
         # Ensure desired units are loaded and started:
         for name, unit in unit_names.items():
             # Write unit file to disk:
-            unit_path = os.path.join(self._service_dir, name)
+            unit_path = os.path.join(self._unit_dir, name)
             if not os.path.exists(unit_path):
                 logger.debug('Writing unit file: %s', unit_path)
                 with open(unit_path, 'w') as unit_file:
                     unit_file.write(unit.unit_file)
 
             # Write environment file to disk:
-            env_path = os.path.join(self._env_dir, name)
-            if not os.path.exists(env_path):
-                logger.debug('Writing environment file: %s', env_path)
-                # TODO: KMS decrypt
-                with open(env_path, 'w') as env_file:
-                    for key, value in unit.environment.items():
-                        env_file.write(key)
-                        env_file.write('=')
-                        env_file.write(value)
-                        env_file.write('\n')
+            if unit.environment:
+                env_path = os.path.join(self._env_dir, name)
+                if not os.path.exists(env_path):
+                    logger.debug('Writing environment file: %s', env_path)
+                    # TODO: KMS decrypt
+                    with open(env_path, 'w') as env_file:
+                        for key, value in unit.environment.items():
+                            env_file.write(key)
+                            env_file.write('=')
+                            env_file.write(value)
+                            env_file.write('\n')
+
             try:
                 self._manager.reload()
             except Exception as e:

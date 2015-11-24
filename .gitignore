@@ -1,2 +1,4 @@
 build/
 out/
+.coverage
+npm-debug.log
