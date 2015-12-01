@@ -81,3 +81,6 @@ class TestFlotillaServiceRevision(unittest.TestCase):
 
     def test_revision_hash(self):
         self.assertEqual(self.revision.revision_hash, REV_HASH)
+
+    def test_repr(self):
+        self.assertEqual('Revision initial (1): 1 units', str(self.revision))
