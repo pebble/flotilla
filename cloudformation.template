@@ -135,18 +135,89 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:PutItem"
+                    "dynamodb:DescribeTable"
                   ],
-                  "Resource": {
-                    "Fn::Join": [
-                      "", [
-                        "arn:aws:dynamodb:us-east-1",
-                        ":",
-                        {"Ref": "AWS::AccountId"},
-                        ":table/flotilla-status"
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-assignments"
+                        ]
                       ]
-                    ]
-                  }
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-locks"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-revisions"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-status"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-units"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-locks"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-status"
+                        ]
+                      ]
+                    }
+                  ]
                 },
                 {
                   "Effect": "Allow",
@@ -161,6 +232,16 @@
                           ":",
                           {"Ref": "AWS::AccountId"},
                           ":table/flotilla-assignments"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-locks"
                         ]
                       ]
                     },
@@ -188,6 +269,22 @@
                         ":",
                         {"Ref": "AWS::AccountId"},
                         ":table/flotilla-units"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DeleteItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:us-east-1",
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-locks"
                       ]
                     ]
                   }
@@ -245,7 +342,7 @@
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
         "InstanceType": "t2.micro",
-        "ImageId": "ami-37bdc15d",
+        "ImageId": "ami-1a642670",
         "SecurityGroups": [{"Ref": "WorkerSecurityGroup"}],
         "AssociatePublicIpAddress": "true",
         "IamInstanceProfile": {"Ref": "WorkerInstanceProfile"},
@@ -295,9 +392,9 @@
     "WorkerASG": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
-        "MinSize": 2,
+        "MinSize": 1,
         "MaxSize": 2,
-        "DesiredCapacity": 2,
+        "DesiredCapacity": 1,
         "LoadBalancerNames": [
           {"Ref": "Elb"}
         ],
