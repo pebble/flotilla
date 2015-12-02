@@ -6,8 +6,10 @@ logger = logging.getLogger('flotilla')
 
 
 class FlotillaScheduler(object):
-    def __init__(self, db):
+    def __init__(self, db, locks, lock_ttl=30):
         self._db = db
+        self._locks = locks
+        self._lock_ttl = lock_ttl
         self.active = False
 
     def loop(self):
@@ -78,6 +80,15 @@ class FlotillaScheduler(object):
             if reassigned and self.active:
                 logger.debug('Storing %d reassignments.', len(reassigned))
                 self._db.set_assignments(reassigned)
+
+    def lock(self):
+        if self._locks.try_lock('scheduler', ttl=self._lock_ttl, refresh=True):
+            if not self.active:
+                logger.info('Became active scheduler')
+                self.active = True
+        elif self.active:
+            logger.info('No longer active scheduler')
+            self.active = False
 
     @staticmethod
     def _instance_targets(revisions, instance_count):
