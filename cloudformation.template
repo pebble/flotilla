@@ -135,7 +135,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:*"
+                    "dynamodb:PutItem"
                   ],
                   "Resource": {
                     "Fn::Join": [
@@ -143,7 +143,51 @@
                         "arn:aws:dynamodb:us-east-1",
                         ":",
                         {"Ref": "AWS::AccountId"},
-                        ":table/flotilla-*"
+                        ":table/flotilla-status"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-assignments"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:us-east-1",
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-revisions"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:BatchGetItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:us-east-1",
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-units"
                       ]
                     ]
                   }
@@ -221,7 +265,7 @@
                 "        ", "\n",
                 "        [Service]", "\n",
                 "        User=core", "\n",
-                "        ExecStartPre=-/usr/bin/docker kill flotilla",  "\n",
+                "        ExecStartPre=-/usr/bin/docker kill flotilla", "\n",
                 "        ExecStartPre=-/usr/bin/docker rm flotilla", "\n",
                 "        ExecStartPre=-/usr/bin/docker pull pwagner/flotilla",
                 "\n",
