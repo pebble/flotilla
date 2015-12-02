@@ -14,30 +14,26 @@ class FlotillaScheduler(object):
         if not self.active:
             return
 
-        loop_start = time.time()
-        logger.debug('Starting scheduler loop.')
-
         service_weights = self._db.get_revision_weights()
-        service_count = len(service_weights)
         for service, revisions in service_weights.items():
             logger.debug('Balancing assignments: %s (%s revisions).', service,
                          len(revisions))
+            if len(revisions) == 0:
+                continue
 
             # Get all instances in the service (assigned or not):
-            assignments = self._db.get_instance_assignments(service)
-            print assignments
-            instance_count = len(assignments)
-            if not assignments:
+            current_assignments = self._db.get_instance_assignments(service)
+            if len(current_assignments) < 2 \
+                    and len(current_assignments[None]) == 0:
                 logger.debug('No instances, can not assign %s.', service)
                 continue
+            instance_count = sum([len(rev_assignments) for rev_assignments in
+                                  current_assignments.values()])
             logger.debug("Found %s assignable instances.", instance_count)
 
             # Determine ideal distribution of instances:
             target_counts = self._instance_targets(revisions, instance_count)
             logger.debug('Target instance counts: %s', target_counts)
-
-            # Index instances by assignment:
-            current_assignments = self._assignments_index(assignments)
 
             # Instances without an assignment can be scheduled:
             assignable = current_assignments.get(None, [])
@@ -82,18 +78,6 @@ class FlotillaScheduler(object):
             if reassigned and self.active:
                 logger.debug('Storing %d reassignments.', len(reassigned))
                 self._db.set_assignments(reassigned)
-
-        # TODO: publish as custom CW metric
-        loop_time = time.time() - loop_start
-        logger.debug('Completed scheduler loop in %fs.', loop_time)
-
-    @staticmethod
-    def _assignments_index(assignments):
-        current_assignments = defaultdict(list)
-        for assignment_item in assignments.values():
-            assignment = assignment_item['assignment']
-            current_assignments[assignment].append(assignment_item)
-        return current_assignments
 
     @staticmethod
     def _instance_targets(revisions, instance_count):

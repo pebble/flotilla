@@ -1,0 +1,86 @@
+import unittest
+from mock import MagicMock, ANY
+from flotilla.scheduler.db import FlotillaSchedulerDynamo
+from boto.dynamodb2.table import Table, BatchTable
+
+SERVICE = 'test'
+INSTANCE_ID = 'i-123456'
+REVISION = 'rev1'
+
+
+class TestFlotillaSchedulerDynamo(unittest.TestCase):
+    def setUp(self):
+        self.assignments = MagicMock(spec=Table)
+        self.assignments._dynamizer = MagicMock()
+        self.services = MagicMock(spec=Table)
+        self.status = MagicMock(spec=Table)
+
+        self.db = FlotillaSchedulerDynamo(self.assignments, self.services,
+                                          self.status)
+
+    def test_get_revision_weights_empty(self):
+        weights = self.db.get_revision_weights()
+        self.assertEqual(0, len(weights))
+
+    def test_get_revision_weights(self):
+        self.services.scan.return_value = [
+            {
+                'service_name': SERVICE,
+                REVISION: 1,
+                'rev2': 2
+            },
+            {
+                'service_name': 'test2',
+                'rev3': 1,
+                'rev4': 2
+            }
+        ]
+
+        weights = self.db.get_revision_weights()
+        self.assertEqual(2, len(weights))
+
+        service_test = weights[SERVICE]
+        self.assertEqual(1, service_test[REVISION])
+        self.assertEqual(2, service_test['rev2'])
+
+        service_test = weights['test2']
+        self.assertEqual(1, service_test['rev3'])
+        self.assertEqual(2, service_test['rev4'])
+
+    def test_set_assignment(self):
+        self.db.set_assignment(SERVICE, INSTANCE_ID, REVISION)
+        self.assignments.put_item.assert_called_with(data=ANY, overwrite=True)
+
+    def test_set_assignments(self):
+        mock_batch = MagicMock(spec=BatchTable)
+        self.assignments.batch_write.return_value = mock_batch
+
+        self.db.set_assignments([
+            {'instance_id': INSTANCE_ID},
+            {'instance_id': INSTANCE_ID}
+        ])
+        mock_batch.put_item.call_count = 2
+
+    def test_get_instance_assignments_empty(self):
+        assignments = self.db.get_instance_assignments(SERVICE)
+        self.assertEqual(1, len(assignments))
+        self.assertEqual([], assignments[None])
+
+    def test_get_instance_assignments_assigned(self):
+        self.status.query_2.return_value = [{
+            'instance_id': INSTANCE_ID
+        }]
+        self.assignments.batch_get.return_value = [{
+            'instance_id': INSTANCE_ID,
+            'assignment': REVISION
+        }]
+
+        assignments = self.db.get_instance_assignments(SERVICE)
+        self.assertEqual(1, len(assignments[REVISION]))
+
+    def test_get_instance_assignments_unassigned(self):
+        self.status.query_2.return_value = [{
+            'instance_id': INSTANCE_ID
+        }]
+        assignments = self.db.get_instance_assignments(SERVICE)
+        self.assertEqual(1, len(assignments[None]))

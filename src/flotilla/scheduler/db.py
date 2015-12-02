@@ -1,5 +1,6 @@
 import logging
 from boto.dynamodb2.items import Item
+from collections import defaultdict
 
 logger = logging.getLogger('flotilla')
 
@@ -46,14 +47,6 @@ class FlotillaSchedulerDynamo(object):
             for assignment in assignments:
                 batch.put_item(assignment)
 
-    def get_instances(self, service):
-        """Get instances and assigned revisions for a service.
-        :param service:  Service name.
-        :return: Dict of instance id to assigned revision.
-        """
-        return {a['instance_id']: a
-                for a in self._status.query_2(service__eq=service)}
-
     def get_instance_assignments(self, service):
         """Get instances and assignments for a service
         :param service:  Service name.
@@ -63,18 +56,19 @@ class FlotillaSchedulerDynamo(object):
                      self._status.query_2(service__eq=service,
                                           attributes=('instance_id',))]
 
-        assignments = {}
+        assignments = defaultdict(list)
+        unassigned = set(instances)
         for assignment in self._assignments.batch_get(
                 keys=[{'instance_id': i} for i in instances],
                 attributes=('instance_id', 'assignment')):
-            assignments[assignment['instance_id']] = assignment
+            assigned = assignment['assignment']
+            instance_id = assignment['instance_id']
+            unassigned.remove(instance_id)
+            assignments[assigned].append(assignment)
 
-        for instance_id in instances:
-            if instance_id in assignments:
-                continue
-            assignments[instance_id] = Item(self._assignments, data={
-                'instance_id': instance_id,
-                'service': service
-            })
+        assignments[None] = [Item(self._assignments, data={
+            'instance_id': instance_id,
+            'service': service
+        }) for instance_id in unassigned]
 
         return assignments
