@@ -32,24 +32,6 @@ class FlotillaAgent(object):
                 finally:
                     self._locks.release_lock(deploy_lock)
 
-    # def scheduler_election(self):
-    #     """Verify scheduler is alive, takeover if necessary."""
-    #     scheduler_ttl = 45
-    #     scheduler_active = self._db.try_lock('scheduler', ttl=scheduler_ttl)
-    #     if scheduler_active and not self._scheduler.active:
-    #         logger.debug('We are now the active scheduler')
-    #         self._scheduler.active = True
-    #         return True
-    #         self._election.interval = self.leader_interval / 2
-    #     elif not scheduler_active and self._scheduler.active:
-    #         logger.warn('We are no longer the active scheduler')
-    #         self._scheduler.active = False
-    #         return False
-    #
-    # def scheduler_loop(self):
-    #     """Update assignments (no-op unless active)."""
-    #     self._scheduler.loop()
-
     def health(self):
         """Write health to systemd."""
         units_status = self._systemd.get_unit_status()
