@@ -5,9 +5,6 @@ from flotilla.model import FlotillaServiceRevision, FlotillaDockerService
 from boto.dynamodb2.exceptions import ItemNotFound
 from boto.dynamodb2.table import Table
 from boto.dynamodb2.items import Item
-import logging
-
-logging.getLogger('boto').setLevel(logging.CRITICAL)
 
 SERVICE_NAME = 'foo'
 
@@ -35,6 +32,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
             self.service_data.__getitem__
         self.service_item.__contains__.side_effect = \
             self.service_data.__contains__
+        self.service_item.keys.side_effect = self.service_data.keys
         self.services.get_item.return_value = self.service_item
         self.db = FlotillaClientDynamo(self.units,
                                        self.revisions,
@@ -50,7 +48,23 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.revisions.has_item.return_value = True
 
         self.db.add_revision(SERVICE_NAME, self.revision)
+
         self.revisions.new_item.assert_not_called()
+
+    def test_add_revision_missing_unit(self):
+        self.units.has_item.return_value = False
+
+        self.db.add_revision(SERVICE_NAME, self.revision)
+
+        self.units.batch_write.assert_called_with()
+        self.units.new_item.assert_called_with(ANY)
+
+    def test_add_revision_missing_service(self):
+        self.services.get_item.side_effect = ItemNotFound()
+
+        self.db.add_revision(SERVICE_NAME, self.revision)
+
+        self.services.new_item.assert_called_with(SERVICE_NAME)
 
     def test_del_revision(self):
         self.db.del_revision(SERVICE_NAME, self.rev_hash)
@@ -82,4 +96,23 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.service_item.partial_save.assert_not_called()
 
     def test_get_revisions(self):
-        self.db.get_revisions(SERVICE_NAME)
+        self.revisions.batch_get.return_value = [
+            {'rev_hash': self.rev_hash, 'label': 'test',
+             'units': ['000', '001']}]
+        self.units.batch_get.return_value = [
+            {'name': 'test', 'unit_file': '', 'environment': '',
+             'unit_hash': '000'},
+            {'name': 'test', 'unit_file': '', 'environment': '',
+             'unit_hash': '001'}
+        ]
+        revisions = self.db.get_revisions(SERVICE_NAME)
+
+        self.assertEqual(1, len(revisions))
+        test_rev = revisions[0]
+        self.assertEqual('test', test_rev.label)
+        self.assertEqual(2, len(test_rev.units))
+
+    def test_get_revisions_not_found(self):
+        self.services.get_item.side_effect = ItemNotFound()
+        revisions = self.db.get_revisions(SERVICE_NAME)
+        self.assertEqual(0, len(revisions))

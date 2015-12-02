@@ -123,6 +123,6 @@ class FlotillaClientDynamo(object):
 
             unit_revs = unit_rev[unit['unit_hash']]
             logger.debug('Adding to %d revisions.', len(unit_revs))
-            for unit_rev in unit_revs:
-                flotilla_revisions[unit_rev].units.append(flotilla_unit)
+            for rev in unit_revs:
+                flotilla_revisions[rev].units.append(flotilla_unit)
         return flotilla_revisions.values()
