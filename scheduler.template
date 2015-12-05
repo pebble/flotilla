@@ -1,0 +1,605 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Flotilla scheduler",
+  "Parameters": {
+    "FlotillaEnvironment": {
+      "Type": "String",
+      "Default": "develop",
+      "Description": "Name of environment. i.e. test, staging, production"
+    },
+    "InstanceType": {
+      "Type": "String",
+      "Default": "t2.micro",
+      "Description": "Instance type for scheduler."
+    },
+    "Ami": {
+      "Type": "AWS::EC2::Image::Id",
+      "Default": "ami-1a642670",
+      "Description": "AMI for scheduler instances."
+    },
+    "Az1": {
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1a",
+      "Description": "First AZ."
+    },
+    "Az2": {
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1c",
+      "Description": "Second AZ."
+    },
+    "Az3": {
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1d",
+      "Description": "Third AZ."
+    }
+  },
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "192.168.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "vpc"]]
+            }
+          }
+        ]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "AttachGateway": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "InternetGatewayId": {"Ref": "InternetGateway"}
+      }
+    },
+    "PublicSubnet01": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.1.0/24",
+        "AvailabilityZone": {"Ref": "Az1"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public01"]]
+            }
+          }
+        ]
+      }
+    },
+    "PublicSubnet02": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.2.0/24",
+        "AvailabilityZone": {"Ref": "Az2"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public02"]]
+            }
+          }
+        ]
+      }
+    },
+    "PublicSubnet03": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.3.0/24",
+        "AvailabilityZone": {"Ref": "Az3"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public03"]]
+            }
+          }
+        ]
+      }
+    },
+    "PublicRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"}
+      }
+    },
+    "PublicRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PublicRouteTable"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {"Ref": "InternetGateway"}
+      }
+    },
+    "PublicSubnet01RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PublicSubnet01"},
+        "RouteTableId": {"Ref": "PublicRouteTable"}
+      }
+    },
+    "PublicSubnet02RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PublicSubnet02"},
+        "RouteTableId": {"Ref": "PublicRouteTable"}
+      }
+    },
+    "PublicSubnet03RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PublicSubnet03"},
+        "RouteTableId": {"Ref": "PublicRouteTable"}
+      }
+    },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Scheduler security group",
+        "VpcId": {"Ref": "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "Role": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["ec2.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "FlotillaDynamo",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-*"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:PutItem",
+                    "dynamodb:BatchWriteItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-assignments"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-services"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:Query"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-status"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DeleteItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-locks"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-stacks"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {"Ref": "Role"}
+        ]
+      }
+    },
+    "LaunchConfig": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "InstanceType": {"Ref": "InstanceType"},
+        "ImageId": {"Ref": "Ami"},
+        "SecurityGroups": [{"Ref": "SecurityGroup"}],
+        "AssociatePublicIpAddress": "true",
+        "IamInstanceProfile": {"Ref": "InstanceProfile"},
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "", [
+                "#cloud-config", "\n",
+                "\n",
+                "coreos:", "\n",
+                "  units:", "\n",
+                "    - name: flotilla.service", "\n",
+                "      command: start", "\n",
+                "      content: |", "\n",
+                "        [Unit]", "\n",
+                "        Description=Flotilla scheduler", "\n",
+                "        ", "\n",
+                "        [Service]", "\n",
+                "        User=core", "\n",
+                "        ExecStartPre=-/usr/bin/docker kill flotilla-scheduler", "\n",
+                "        ExecStartPre=-/usr/bin/docker rm flotilla-scheduler", "\n",
+                "        ExecStartPre=-/usr/bin/docker pull pwagner/flotilla",
+                "\n",
+                "        ExecStart=/usr/bin/docker run --name flotilla-scheduler",
+                " -e FLOTILLA_ENV=", {"Ref": "FlotillaEnvironment"},
+                " pwagner/flotilla /env/bin/python /app/scheduler.py", "\n",
+                "        ExecStop=/usr/bin/docker stop flotilla-scheduler",
+                "\n",
+                "\n",
+                "users:", "\n",
+                "  - name: core", "\n",
+                "    ssh-authorized-keys:", "\n",
+                "      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDeaQWX1gvmJPKChpAET2ea688JudDtsn77XqvzcLf3na45Ri1RZA469vwxLpZ1y0VeQxNz74s0qh4+ZUuvO8u2ygkodgU0ZpeHVetXmd11Ct4JHhRicvXlDs07uyQPcl1QJaCbAzC89iBetuR+QJps3pE82sqjeL5uniZMoWFpzT3uicc7+bLepF6PY+PYYWWPRu6wjV876lFKZqABP7hzH7TJAMOa0tMRLcQRFLOUgMWHr3Hbw52VQWszGvhseA3uAUEJ1IEXkY10dSqvZkCykv2sjoGK7nSQqZTBx5B6rvuQoVIytI3VUrVbSMGJjStmGYV2RdFBrpmENJYAfRoG4bhkYBrt42UInNUwj84VLMVl0r/YbSAzFGzZzUvj2b2Dgz6lS4N4U4KFXQZlCGwlgFr+oR74La0c+pI+kwsYA9uV1a0eWiJig9V/6HLVY5P7mMCsVihqH2EjpZQDod03RlSBFqUv3Uf/7odT6bjewShTbDHs3isFyg4VAoZo4p1awKgmjTzGJDzrWlBdsBbJZlXVClIDhlOGkDRxrNeBoPJ4wywvXCtiwK2MRB7/Qq4j84p431V4N0rEsQa6kQXSyyOWoB/j4h92ZjEIYgKWMXjGkIi4Uj0njRA6zwur2n4F3fqrwvJaCXvXPE9Zjkq2d/aq7AxVuMpy7iLQonKrEQ==",
+                "\n",
+                "\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "ASG": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "MinSize": 1,
+        "MaxSize": 2,
+        "DesiredCapacity": 1,
+        "LaunchConfigurationName": {"Ref": "LaunchConfig"},
+        "VPCZoneIdentifier": [
+          {"Ref": "PublicSubnet01"},
+          {"Ref": "PublicSubnet02"},
+          {"Ref": "PublicSubnet03"}
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "scheduler"]]
+            },
+            "PropagateAtLaunch": true
+          }
+        ]
+      }
+    },
+    "AssignmentsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "assignments"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "instance_id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "instance_id",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "LocksTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "locks"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "lock_name",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "lock_name",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "RevisionsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "revisions"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "rev_hash",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "rev_hash",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "ServicesTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "services"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "service_name",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "service_name",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "StacksTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "stacks"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "stack_arn",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "stack_arn",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "StatusTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "status"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "service",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "instance_id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "service",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "instance_id",
+            "KeyType": "RANGE"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "UnitsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "units"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "unit_hash",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "unit_hash",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    }
+  }
+}
