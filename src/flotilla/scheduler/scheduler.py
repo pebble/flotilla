@@ -26,8 +26,7 @@ class FlotillaScheduler(object):
 
                 # Get all instances in the service (assigned or not):
                 current_assignments = self._db.get_instance_assignments(service)
-                if len(current_assignments) < 2 \
-                        and len(current_assignments[None]) == 0:
+                if not current_assignments:
                     logger.debug('No instances, can not assign %s.', service)
                     continue
                 instance_count = sum(

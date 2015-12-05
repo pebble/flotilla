@@ -57,6 +57,9 @@ class FlotillaSchedulerDynamo(object):
                                           attributes=('instance_id',))]
 
         assignments = defaultdict(list)
+        if not instances:
+            return assignments
+
         unassigned = set(instances)
         for assignment in self._assignments.batch_get(
                 keys=[{'instance_id': i} for i in instances],

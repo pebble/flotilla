@@ -63,8 +63,7 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
 
     def test_get_instance_assignments_empty(self):
         assignments = self.db.get_instance_assignments(SERVICE)
-        self.assertEqual(1, len(assignments))
-        self.assertEqual([], assignments[None])
+        self.assertEqual(0, len(assignments))
 
     def test_get_instance_assignments_assigned(self):
         self.status.query_2.return_value = [{

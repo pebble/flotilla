@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # Start loops:
     funcs = [
-        RepeatingFunc('scheduler', scheduler.loop, 15),
         RepeatingFunc('scheduler-lock', scheduler.lock, 15),
+        RepeatingFunc('scheduler', scheduler.loop, 15)
     ]
     map(RepeatingFunc.start, funcs)
