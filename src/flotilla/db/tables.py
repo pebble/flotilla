@@ -16,9 +16,12 @@ SCHEMAS = {
 
 
 class DynamoDbTables(object):
-    def __init__(self, dynamo, prefix='flotilla-'):
+    def __init__(self, dynamo, environment=None):
         self._dynamo = dynamo
-        self._prefix = prefix
+        if environment:
+            self._prefix = 'flotilla-{0}-'.format(environment)
+        else:
+            self._prefix = 'flotilla-'
         self.assignments = None
         self.locks = None
         self.revisions = None

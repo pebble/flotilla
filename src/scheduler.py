@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import boto.dynamodb2
 from main import get_instance_id, setup_logging
 from flotilla.db import DynamoDbTables, DynamoDbLocks
@@ -11,12 +12,14 @@ if __name__ == '__main__':
 
     # Identity:
     instance_id = get_instance_id()
+    environment = os.environ.get('FLOTILLA_ENV')
 
     # AWS services:
-    dynamo = boto.dynamodb2.connect_to_region('us-east-1')
+    db_region = os.environ.get('FLOTILLA_REGION', 'us-east-1')
+    dynamo = boto.dynamodb2.connect_to_region(db_region)
 
     # DynamoDB:
-    tables = DynamoDbTables(dynamo)
+    tables = DynamoDbTables(dynamo, environment=environment)
     tables.setup(['assignments', 'locks', 'services', 'status'])
     db = FlotillaSchedulerDynamo(tables.assignments, tables.services,
                                  tables.status)

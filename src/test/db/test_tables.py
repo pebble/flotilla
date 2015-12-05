@@ -71,3 +71,9 @@ class TestDynamoDbTables(unittest.TestCase):
 
         self.dynamo.describe_table.assert_not_called()
         self.dynamo.create_table.assert_not_called()
+
+    def test_setup_environment(self):
+        self.tables = DynamoDbTables(self.dynamo, environment='test')
+        self.tables.setup(['revisions'])
+        self.assertEqual(self.tables.revisions.table_name,
+                         'flotilla-test-revisions')
