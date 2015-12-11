@@ -13,10 +13,11 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assignments = MagicMock(spec=Table)
         self.assignments._dynamizer = MagicMock()
         self.services = MagicMock(spec=Table)
+        self.stacks = MagicMock(spec=Table)
         self.status = MagicMock(spec=Table)
 
         self.db = FlotillaSchedulerDynamo(self.assignments, self.services,
-                                          self.status)
+                                          self.stacks, self.status)
 
     def test_get_revision_weights_empty(self):
         weights = self.db.get_revision_weights()
@@ -83,3 +84,17 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         }]
         assignments = self.db.get_instance_assignments(SERVICE)
         self.assertEqual(1, len(assignments[None]))
+
+    def test_get_stacks_empty(self):
+        stacks = self.db.get_stacks()
+        self.assertEqual(0, len(stacks))
+
+    def test_get_stacks(self):
+        self.stacks.scan.return_value = [{'service_name': 'fred'}]
+        stacks = self.db.get_stacks()
+        self.assertEqual(1, len(stacks))
+        self.assertEquals('fred', stacks[0]['service_name'])
+
+    def test_set_stacks(self):
+        self.db.set_stacks([])
+        self.stacks.batch_write.assert_called_with()

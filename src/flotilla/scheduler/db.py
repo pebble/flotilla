@@ -6,9 +6,10 @@ logger = logging.getLogger('flotilla')
 
 
 class FlotillaSchedulerDynamo(object):
-    def __init__(self, assignments, services, status):
+    def __init__(self, assignments, services, stacks, status):
         self._assignments = assignments
         self._services = services
+        self._stacks = stacks
         self._status = status
 
         # TODO: shard scan for multiple schedulers
@@ -19,8 +20,7 @@ class FlotillaSchedulerDynamo(object):
         """Load services, revisions and weights"""
         services = {}
         rev_count = 0
-        for service in self._services.scan(segment=self._segment,
-                                           total_segments=self._segments):
+        for service in self.services():
             name = service['service_name']
             del service['service_name']
 
@@ -31,6 +31,19 @@ class FlotillaSchedulerDynamo(object):
         logger.debug('Loaded %s services, %s revisions', len(services),
                      rev_count)
         return services
+
+    def services(self):
+        for service in self._services.scan(segment=self._segment,
+                                           total_segments=self._segments):
+            yield service
+
+    def get_stacks(self):
+        return [s for s in self._stacks.scan()]
+
+    def set_stacks(self, stacks):
+        with self._stacks.batch_write() as batch:
+            for stack in stacks:
+                batch.put_item(stack)
 
     def set_assignment(self, service, machine, assignment):
         self._assignments.put_item(data={

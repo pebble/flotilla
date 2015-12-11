@@ -10,6 +10,7 @@ SCHEMAS = {
     'locks': [HashKey('lock_name')],
     'revisions': [HashKey('rev_hash')],
     'services': [HashKey('service_name')],
+    'stacks': [HashKey('stack_arn')],
     'status': [HashKey('service'), RangeKey('instance_id')],
     'units': [HashKey('unit_hash')]
 }
@@ -26,6 +27,7 @@ class DynamoDbTables(object):
         self.locks = None
         self.revisions = None
         self.services = None
+        self.stacks = None
         self.status = None
         self.units = None
 
