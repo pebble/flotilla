@@ -1,0 +1,523 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Flotilla service",
+  "Parameters": {
+    "FlotillaEnvironment": {
+      "Type": "String",
+      "Default": "develop",
+      "Description": "Name of environment. i.e. test, staging, production"
+    },
+    "ServiceName": {
+      "Type": "String",
+      "Description": "Name of service"
+    },
+    "VpcId": {
+      "Description": "VPC id",
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "Ami": {
+      "Description": "CoreOS AMI",
+      "Type": "AWS::EC2::Image::Id",
+      "Default": "ami-bf8477fb"
+    },
+    "NatSecurityGroup": {
+      "Description": "Security group for NAT/gateway instances",
+      "Type": "AWS::EC2::SecurityGroup::Id"
+    },
+    "InstanceType": {
+      "Description": "Worker instance type",
+      "Default": "t2.micro",
+      "Type": "String"
+    },
+    "InstanceMax": {
+      "Description": "The maximum number of instances in autoscaling group",
+      "Type": "Number",
+      "Default": "1"
+    },
+    "InstanceMin": {
+      "Description": "The minimum number of instances in autoscaling group",
+      "Type": "Number",
+      "Default": "1"
+    },
+    "ElbScheme": {
+      "Description": "Scheme for ELB",
+      "Type": "String",
+      "Default": "internet-facing",
+      "AllowedValues": ["internet-facing", "internal"]
+    },
+    "HealthCheckTarget": {
+      "Description": "Target for HealthCheck.",
+      "Type": "String",
+      "Default": "TCP:80",
+      "AllowedPattern": "(TCP|HTTP|HTTPS|SSL):(.*?)"
+    },
+    "PrivateSubnet01": {
+      "Type": "AWS::EC2::Subnet::Id",
+      "Description": "First private subnet."
+    },
+    "PrivateSubnet02": {
+      "Type": "AWS::EC2::Subnet::Id",
+      "Description": "Second private subnet."
+    },
+    "PrivateSubnet03": {
+      "Type": "AWS::EC2::Subnet::Id",
+      "Description": "Third private subnet."
+    },
+    "PublicSubnet01": {
+      "Type": "AWS::EC2::Subnet::Id",
+      "Description": "First public subnet."
+    },
+    "PublicSubnet02": {
+      "Type": "AWS::EC2::Subnet::Id",
+      "Description": "Second public subnet."
+    },
+    "PublicSubnet03": {
+      "Type": "AWS::EC2::Subnet::Id",
+      "Description": "Third public subnet."
+    },
+    "VirtualHost": {
+      "Type": "String",
+      "Description": "DNS hostname"
+    },
+    "VirtualHostDomain": {
+      "Type": "String",
+      "Description": "DNS TLD"
+    },
+    "DynamoDbRegion": {
+      "Type": "String",
+      "Default": "us-east-1",
+      "Description": "DynamoDB region"
+    }
+  },
+  "Conditions": {
+    "ElbPublic": {
+      "Fn::Equals": [
+        {"Ref": "ElbScheme"},
+        "internet-facing"
+      ]
+    }
+  },
+  "Resources": {
+    "InstanceSg": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": {
+          "Fn::Join": [
+            " ", [{"Ref": "AWS::StackName"}, "instances"]
+          ]
+        },
+        "VpcId": {"Ref": "VpcId"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "SourceSecurityGroupId": {"Ref": "NatSecurityGroup"}
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "SourceSecurityGroupId": {"Ref": "ElbSg"}
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "instance"]]
+            }
+          }
+        ]
+      }
+    },
+    "ElbSg": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security Group",
+        "VpcId": {"Ref": "VpcId"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "Role": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["ec2.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DescribeEC2Autoscaling",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:Describe*",
+                    "autoscaling:Describe*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "FlotillaDynamo",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "DynamoDbRegion"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-*"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "DynamoDbRegion"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-locks"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "DynamoDbRegion"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-status"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "DynamoDbRegion"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-assignments"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "DynamoDbRegion"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-revisions"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:BatchGetItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "DynamoDbRegion"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-units"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "ElbRegistration",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticloadbalancing:DescribeInstanceHealth"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                    "elasticloadbalancing:RegisterInstancesWithLoadBalancer"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:elasticloadbalancing:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":loadbalancer/",
+                        {"Ref": "Elb"}
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/"
+      }
+    },
+    "InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {"Ref": "Role"}
+        ]
+      }
+    },
+    "Lc": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "AssociatePublicIpAddress": false,
+        "ImageId": {"Ref": "Ami"},
+        "InstanceType": {"Ref": "InstanceType"},
+        "IamInstanceProfile": {"Ref": "InstanceProfile"},
+        "InstanceMonitoring": "true",
+        "SecurityGroups": [
+          {"Ref": "InstanceSg"}
+        ],
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/xvda",
+            "Ebs": {"VolumeSize": "20"}
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "", [
+                "#cloud-config", "\n",
+                "\n",
+                "coreos:", "\n",
+                "  units:", "\n",
+                "    - name: flotilla.service", "\n",
+                "      command: start", "\n",
+                "      content: |", "\n",
+                "        [Unit]", "\n",
+                "        Description=Flotilla agent", "\n",
+                "        ", "\n",
+                "        [Service]", "\n",
+                "        User=core", "\n",
+                "        ExecStartPre=-/usr/bin/docker kill flotilla",
+                "\n",
+                "        ExecStartPre=-/usr/bin/docker rm flotilla",
+                "\n",
+                "        ExecStartPre=-/usr/bin/docker pull pwagner/flotilla",
+                "\n",
+                "        ExecStart=/usr/bin/docker run --name flotilla",
+                " -e FLOTILLA_ENV=", {"Ref": "FlotillaEnvironment"},
+                " -e FLOTILLA_SERVICE=", {"Ref": "ServiceName"},
+                " -e FLOTILLA_LB=", {"Ref": "Elb"},
+                " -e FLOTILLA_LB_REGION=", {"Ref": "AWS::Region"},
+                " -v /run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket",
+                " -v /etc/systemd/system:/etc/systemd/system",
+                " -v /etc/flotilla:/etc/flotilla",
+                " pwagner/flotilla", "\n",
+                "        ExecStop=/usr/bin/docker stop flotilla",
+                "\n",
+                "\n",
+                "users:", "\n",
+                "  - name: core", "\n",
+                "    ssh-authorized-keys:", "\n",
+                "      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDeaQWX1gvmJPKChpAET2ea688JudDtsn77XqvzcLf3na45Ri1RZA469vwxLpZ1y0VeQxNz74s0qh4+ZUuvO8u2ygkodgU0ZpeHVetXmd11Ct4JHhRicvXlDs07uyQPcl1QJaCbAzC89iBetuR+QJps3pE82sqjeL5uniZMoWFpzT3uicc7+bLepF6PY+PYYWWPRu6wjV876lFKZqABP7hzH7TJAMOa0tMRLcQRFLOUgMWHr3Hbw52VQWszGvhseA3uAUEJ1IEXkY10dSqvZkCykv2sjoGK7nSQqZTBx5B6rvuQoVIytI3VUrVbSMGJjStmGYV2RdFBrpmENJYAfRoG4bhkYBrt42UInNUwj84VLMVl0r/YbSAzFGzZzUvj2b2Dgz6lS4N4U4KFXQZlCGwlgFr+oR74La0c+pI+kwsYA9uV1a0eWiJig9V/6HLVY5P7mMCsVihqH2EjpZQDod03RlSBFqUv3Uf/7odT6bjewShTbDHs3isFyg4VAoZo4p1awKgmjTzGJDzrWlBdsBbJZlXVClIDhlOGkDRxrNeBoPJ4wywvXCtiwK2MRB7/Qq4j84p431V4N0rEsQa6kQXSyyOWoB/j4h92ZjEIYgKWMXjGkIi4Uj0njRA6zwur2n4F3fqrwvJaCXvXPE9Zjkq2d/aq7AxVuMpy7iLQonKrEQ==",
+                "\n",
+                "\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "Asg": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "Cooldown": "300",
+        "DesiredCapacity": {"Ref": "InstanceMin"},
+        "MaxSize": {"Ref": "InstanceMax"},
+        "MinSize": {"Ref": "InstanceMin"},
+        "HealthCheckGracePeriod": "300",
+        "HealthCheckType": "ELB",
+        "VPCZoneIdentifier": [
+          {"Ref": "PrivateSubnet01"},
+          {"Ref": "PrivateSubnet02"},
+          {"Ref": "PrivateSubnet03"}
+        ],
+        "LaunchConfigurationName": {"Ref": "Lc"},
+        "LoadBalancerNames": [
+          {"Ref": "Elb"}
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "worker"]]},
+            "PropagateAtLaunch": true
+          }
+        ]
+      }
+    },
+    "Elb": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+        "Scheme": {"Ref": "ElbScheme"},
+        "Subnets": [
+          {
+            "Fn::If": [
+              "ElbPublic",
+              {"Ref": "PublicSubnet01"},
+              {"Ref": "PrivateSubnet01"}
+            ]
+          },
+          {
+            "Fn::If": [
+              "ElbPublic",
+              {"Ref": "PublicSubnet02"},
+              {"Ref": "PrivateSubnet02"}
+            ]
+          },
+          {
+            "Fn::If": [
+              "ElbPublic",
+              {"Ref": "PublicSubnet03"},
+              {"Ref": "PrivateSubnet03"}
+            ]
+          }
+        ],
+        "HealthCheck": {
+          "HealthyThreshold": "2",
+          "Interval": "30",
+          "Target": {"Ref": "HealthCheckTarget"},
+          "Timeout": "5",
+          "UnhealthyThreshold": "4"
+        },
+        "SecurityGroups": [
+          {"Ref": "ElbSg"}
+        ],
+        "Listeners": [
+          {
+            "InstancePort": "80",
+            "LoadBalancerPort": "80",
+            "Protocol": "HTTP",
+            "InstanceProtocol": "HTTP"
+          }
+        ],
+        "CrossZone": "true",
+        "ConnectionDrainingPolicy": {
+          "Enabled": true,
+          "Timeout": 60
+        }
+      }
+    },
+    "DnsRecord": {
+      "Type": "AWS::Route53::RecordSetGroup",
+      "Properties": {
+        "HostedZoneName": {"Ref": "VirtualHostDomain"},
+        "Comment": "Alias for ELB",
+        "RecordSets": [
+          {
+            "Name": {"Ref": "VirtualHost"},
+            "Type": "A",
+            "SetIdentifier": {
+              "Fn::Join": [
+                "-", [{"Ref": "AWS::StackName"}, {"Ref": "AWS::Region"}]
+              ]
+            },
+            "Region": {"Ref": "AWS::Region"},
+            "AliasTarget": {
+              "HostedZoneId": {
+                "Fn::GetAtt": ["Elb", "CanonicalHostedZoneNameID"]
+              },
+              "DNSName": {"Fn::GetAtt": ["Elb", "CanonicalHostedZoneName"]}
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "InstanceSg": {
+      "Value": {"Ref": "InstanceSg"}
+    }
+  }
+}

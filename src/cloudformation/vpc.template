@@ -1,0 +1,417 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "VPC for flotilla",
+  "Parameters": {
+    "NatInstanceType": {
+      "Type": "String",
+      "Default": "t2.micro",
+      "Description": "Instance type for NAT instances."
+    },
+    "NatAmi": {
+      "Type": "AWS::EC2::Image::Id",
+      "Description": "AMI for NAT instances."
+    },
+    "Az1": {
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1a",
+      "Description": "First AZ."
+    },
+    "Az2": {
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1c",
+      "Description": "Second AZ."
+    },
+    "Az3": {
+      "Type": "AWS::EC2::AvailabilityZone::Name",
+      "Default": "us-east-1d",
+      "Description": "Third AZ."
+    }
+  },
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "192.168.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "vpc"]]
+            }
+          }
+        ]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "AttachGateway": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "InternetGatewayId": {"Ref": "InternetGateway"}
+      }
+    },
+    "PublicSubnet01": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.1.0/24",
+        "AvailabilityZone": {"Ref": "Az1"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public01"]]
+            }
+          }
+        ]
+      }
+    },
+    "PublicSubnet02": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.2.0/24",
+        "AvailabilityZone": {"Ref": "Az2"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public02"]]
+            }
+          }
+        ]
+      }
+    },
+    "PublicSubnet03": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.3.0/24",
+        "AvailabilityZone": {"Ref": "Az3"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public03"]]
+            }
+          }
+        ]
+      }
+    },
+    "PublicRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "Tags": [
+          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
+          {"Key": "Network", "Value": "Public"}
+        ]
+      }
+    },
+    "PublicRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PublicRouteTable"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {"Ref": "InternetGateway"}
+      }
+    },
+    "PublicSubnet01RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PublicSubnet01"},
+        "RouteTableId": {"Ref": "PublicRouteTable"}
+      }
+    },
+    "PublicSubnet02RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PublicSubnet02"},
+        "RouteTableId": {"Ref": "PublicRouteTable"}
+      }
+    },
+    "PublicSubnet03RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PublicSubnet03"},
+        "RouteTableId": {"Ref": "PublicRouteTable"}
+      }
+    },
+    "PrivateSubnet01": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.101.0/24",
+        "AvailabilityZone": {"Ref": "Az1"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private01"]]
+            }
+          },
+          {
+            "Key": "Network",
+            "Value": "Private"
+          }
+        ]
+      }
+    },
+    "PrivateSubnet02": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.102.0/24",
+        "AvailabilityZone": {"Ref": "Az2"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private02"]]
+            }
+          },
+          {
+            "Key": "Network",
+            "Value": "Private"
+          }
+        ]
+      }
+    },
+    "PrivateSubnet03": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "CidrBlock": "192.168.103.0/24",
+        "AvailabilityZone": {"Ref": "Az3"},
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private03"]]
+            }
+          },
+          {
+            "Key": "Network",
+            "Value": "Private"
+          }
+        ]
+      }
+    },
+    "PrivateRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "Tags": [
+          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
+          {"Key": "Network", "Value": "Private"}
+        ]
+      }
+    },
+    "PrivateSubnet01RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PrivateSubnet01"},
+        "RouteTableId": {"Ref": "PrivateRouteTable"}
+      }
+    },
+    "PrivateSubnet02RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PrivateSubnet02"},
+        "RouteTableId": {"Ref": "PrivateRouteTable"}
+      }
+    },
+    "PrivateSubnet03RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {"Ref": "PrivateSubnet03"},
+        "RouteTableId": {"Ref": "PrivateRouteTable"}
+      }
+    },
+    "NatSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "NAT Security Group",
+        "VpcId": {"Ref": "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "192.168.0.0/16"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "192.168.0.0/16"
+          },
+          {
+            "IpProtocol": "udp",
+            "FromPort": "123",
+            "ToPort": "123",
+            "CidrIp": "192.168.0.0/16"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "nat"]]}
+          }
+        ]
+      }
+    },
+    "NatRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["ec2.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DescribeEC2Autoscaling",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:Describe*",
+                    "autoscaling:Describe*"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:ModifyInstanceAttribute",
+                    "ec2:CreateRoute",
+                    "ec2:ReplaceRoute"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/"
+      }
+    },
+    "NatInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {"Ref": "NatRole"}
+        ]
+      }
+    },
+    "NatLC": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "InstanceType": {"Ref": "NatInstanceType"},
+        "ImageId": {"Ref": "NatAmi"},
+        "SecurityGroups": [{"Ref": "NatSecurityGroup"}],
+        "AssociatePublicIpAddress": "true",
+        "IamInstanceProfile": {"Ref": "NatInstanceProfile"},
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "", [
+                "#cloud-config", "\n",
+                "\n",
+                "coreos:", "\n",
+                "  units:", "\n",
+                "    - name: nat-instance.service", "\n",
+                "      command: start", "\n",
+                "      content: |", "\n",
+                "        [Unit]", "\n",
+                "        Description=Enables NAT, updates routing table", "\n",
+                "        After=docker.service", "\n",
+                "        Requires=docker.service", "\n",
+                "        ", "\n",
+                "        [Service]", "\n",
+                "        Type=oneshot", "\n",
+                "        ExecStartPre=/usr/bin/docker pull pebbletech/ha-nat",
+                "\n",
+                "        ExecStart=/usr/bin/docker run --rm --privileged --net=host pebbletech/ha-nat",
+                "\n",
+                "\n",
+                "users:", "\n",
+                "  - name: core", "\n",
+                "    ssh-authorized-keys:", "\n",
+                "      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDeaQWX1gvmJPKChpAET2ea688JudDtsn77XqvzcLf3na45Ri1RZA469vwxLpZ1y0VeQxNz74s0qh4+ZUuvO8u2ygkodgU0ZpeHVetXmd11Ct4JHhRicvXlDs07uyQPcl1QJaCbAzC89iBetuR+QJps3pE82sqjeL5uniZMoWFpzT3uicc7+bLepF6PY+PYYWWPRu6wjV876lFKZqABP7hzH7TJAMOa0tMRLcQRFLOUgMWHr3Hbw52VQWszGvhseA3uAUEJ1IEXkY10dSqvZkCykv2sjoGK7nSQqZTBx5B6rvuQoVIytI3VUrVbSMGJjStmGYV2RdFBrpmENJYAfRoG4bhkYBrt42UInNUwj84VLMVl0r/YbSAzFGzZzUvj2b2Dgz6lS4N4U4KFXQZlCGwlgFr+oR74La0c+pI+kwsYA9uV1a0eWiJig9V/6HLVY5P7mMCsVihqH2EjpZQDod03RlSBFqUv3Uf/7odT6bjewShTbDHs3isFyg4VAoZo4p1awKgmjTzGJDzrWlBdsBbJZlXVClIDhlOGkDRxrNeBoPJ4wywvXCtiwK2MRB7/Qq4j84p431V4N0rEsQa6kQXSyyOWoB/j4h92ZjEIYgKWMXjGkIi4Uj0njRA6zwur2n4F3fqrwvJaCXvXPE9Zjkq2d/aq7AxVuMpy7iLQonKrEQ==",
+                "\n",
+                "\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "NatASG": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "MinSize": 1,
+        "MaxSize": 1,
+        "DesiredCapacity": 1,
+        "LaunchConfigurationName": {"Ref": "NatLC"},
+        "VPCZoneIdentifier": [
+          {"Ref": "PublicSubnet01"},
+          {"Ref": "PublicSubnet02"},
+          {"Ref": "PublicSubnet03"}
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "nat"]]},
+            "PropagateAtLaunch": true
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "VpcId": {
+      "Value": {"Ref": "VPC"}
+    },
+    "PublicSubnet01": {
+      "Value": {"Ref": "PublicSubnet01"}
+    },
+    "PublicSubnet02": {
+      "Value": {"Ref": "PublicSubnet02"}
+    },
+    "PublicSubnet03": {
+      "Value": {"Ref": "PublicSubnet03"}
+    },
+    "PrivateSubnet01": {
+      "Value": {"Ref": "PrivateSubnet01"}
+    },
+    "PrivateSubnet02": {
+      "Value": {"Ref": "PrivateSubnet02"}
+    },
+    "PrivateSubnet03": {
+      "Value": {"Ref": "PrivateSubnet03"}
+    },
+    "NatSecurityGroup": {
+      "Value": {"Ref": "NatSecurityGroup"}
+    }
+  }
+}
