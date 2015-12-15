@@ -7,6 +7,11 @@
       "Default": "develop",
       "Description": "Name of environment. i.e. test, staging, production"
     },
+    "FlotillaDomain": {
+      "Type": "String",
+      "Default": "mycloudand.me",
+      "Description": "Domain name for services"
+    },
     "InstanceType": {
       "Type": "String",
       "Default": "t2.micro",
@@ -383,6 +388,7 @@
                 "\n",
                 "        ExecStart=/usr/bin/docker run --name flotilla-scheduler",
                 " -e FLOTILLA_ENV=", {"Ref": "FlotillaEnvironment"},
+                " -e FLOTILLA_DOMAIN=", {"Ref": "FlotillaDomain"},
                 " pwagner/flotilla /env/bin/python /app/scheduler.py", "\n",
                 "        ExecStop=/usr/bin/docker stop flotilla-scheduler",
                 "\n",

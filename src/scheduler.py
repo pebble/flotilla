@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     # Assemble into scheduler:
     scheduler = FlotillaScheduler(db, locks, lock_ttl=45)
-    provisioner = FlotillaProvisioner(environment, scheduler, db,
+    provisioner = FlotillaProvisioner(environment, domain, scheduler, db,
                                       cloudformation, coreos)
 
     # Start loops:
