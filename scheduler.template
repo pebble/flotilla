@@ -180,6 +180,22 @@
                 {
                   "Effect": "Allow",
                   "Action": [
+                    "cloudformation:CreateStack",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:UpdateStack"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "FlotillaDynamo",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
                     "dynamodb:DescribeTable"
                   ],
                   "Resource": [
@@ -298,6 +314,27 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:BatchGetItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-regions"
+                        ]
+                      ]
+                    }
+                  ]
                 }
               ]
             }
@@ -338,8 +375,10 @@
                 "        ", "\n",
                 "        [Service]", "\n",
                 "        User=core", "\n",
-                "        ExecStartPre=-/usr/bin/docker kill flotilla-scheduler", "\n",
-                "        ExecStartPre=-/usr/bin/docker rm flotilla-scheduler", "\n",
+                "        ExecStartPre=-/usr/bin/docker kill flotilla-scheduler",
+                "\n",
+                "        ExecStartPre=-/usr/bin/docker rm flotilla-scheduler",
+                "\n",
                 "        ExecStartPre=-/usr/bin/docker pull pwagner/flotilla",
                 "\n",
                 "        ExecStart=/usr/bin/docker run --name flotilla-scheduler",
@@ -434,6 +473,36 @@
         "KeySchema": [
           {
             "AttributeName": "lock_name",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
+    "RegionsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "regions"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "region_name",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "region_name",
             "KeyType": "HASH"
           }
         ],

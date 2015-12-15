@@ -8,6 +8,7 @@ logger = logging.getLogger('flotilla')
 SCHEMAS = {
     'assignments': [HashKey('instance_id')],
     'locks': [HashKey('lock_name')],
+    'regions': [HashKey('region_name')],
     'revisions': [HashKey('rev_hash')],
     'services': [HashKey('service_name')],
     'stacks': [HashKey('stack_arn')],

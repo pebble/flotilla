@@ -14,9 +14,9 @@ logging.basicConfig(level=logging.DEBUG,
 logging.getLogger('boto').setLevel(logging.CRITICAL)
 logging.getLogger('requests').setLevel(logging.CRITICAL)
 
-stack_name = 'flotilla-test'
+stack_name = 'flotilla-develop'
 
-with open('../cloudformation.template') as template_in:
+with open('../scheduler.template') as template_in:
     stack_body = template_in.read()
 
 
@@ -44,20 +44,23 @@ def sync_cloudformation(cloudformation):
 
 
 if __name__ == '__main__':
-    dynamo = boto.dynamodb2.connect_to_region('us-east-1')
-    tables = DynamoDbTables(dynamo)
-    tables.setup(['revisions', 'services', 'units'])
-    db = FlotillaClientDynamo(tables.units, tables.revisions, tables.services)
+    # dynamo = boto.dynamodb2.connect_to_region('us-east-1')
+    # tables = DynamoDbTables(dynamo, environment='develop')
+    # tables.setup(['regions', 'revisions', 'services', 'units'])
+    # db = FlotillaClientDynamo(tables.regions, tables.revisions, tables.services,
+    #                           tables.units)
+    #
+    # v3_noconfig = FlotillaDockerService('echo.service',
+    #                                     'pwagner/http-env-echo:3.0.0',
+    #                                     ports={80: 8080},
+    #                                     environment={'MESSAGE': 'test'})
+    # db.add_revision('hello', FlotillaServiceRevision(label='initial',
+    #                                                    units=[v3_noconfig]))
 
-    v3_noconfig = FlotillaDockerService('echo.service',
-                                        'pwagner/http-env-echo:3.0.0',
-                                        ports={80: 8080},
-                                        environment={'MESSAGE': 'test'})
-    db.add_revision('testapp', FlotillaServiceRevision(label='initial',
-                                                       units=[v3_noconfig]))
+    # db.configure_regions(['us-west-2', 'us-east-1'], nat_coreos_channel='stable')
 
     cloudformation = boto.cloudformation.connect_to_region('us-east-1')
     cf_stack = sync_cloudformation(cloudformation)
-    outputs = {output.key: output.value for output in cf_stack.outputs}
-    elb_address = 'http://{0}'.format(outputs['ElbAddress'])
-    print elb_address
+    # outputs = {output.key: output.value for output in cf_stack.outputs}
+    # elb_address = 'http://{0}'.format(outputs['ElbAddress'])
+    # print elb_address

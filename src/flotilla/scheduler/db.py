@@ -6,8 +6,9 @@ logger = logging.getLogger('flotilla')
 
 
 class FlotillaSchedulerDynamo(object):
-    def __init__(self, assignments, services, stacks, status):
+    def __init__(self, assignments, regions, services, stacks, status):
         self._assignments = assignments
+        self._regions = regions
         self._services = services
         self._stacks = stacks
         self._status = status
@@ -88,3 +89,10 @@ class FlotillaSchedulerDynamo(object):
         }) for instance_id in unassigned]
 
         return assignments
+
+    def get_region_params(self, regions):
+        keys = [{'region_name': region} for region in regions]
+        region_params = {region: {} for region in regions}
+        for item in self._regions.batch_get(keys):
+            region_params[item['region_name']] = dict(item)
+        return region_params

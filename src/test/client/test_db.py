@@ -18,13 +18,14 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         ])
         self.rev_hash = self.revision.revision_hash
 
-        self.units = MagicMock(spec=Table)
+        self.regions = MagicMock(spec=Table)
         self.revisions = MagicMock(spec=Table)
+        self.services = MagicMock(spec=Table)
+        self.units = MagicMock(spec=Table)
         self.revision_item = MagicMock(spec=Item)
         self.revisions.has_item.return_value = False
         self.revisions.get_item.return_value = self.revision_item
 
-        self.services = MagicMock(spec=Table)
         self.service_item = MagicMock(spec=Item)
         self.service_data = {}
         self.service_data[self.rev_hash] = 1
@@ -34,9 +35,10 @@ class TestFlotillaClientDynamo(unittest.TestCase):
             self.service_data.__contains__
         self.service_item.keys.side_effect = self.service_data.keys
         self.services.get_item.return_value = self.service_item
-        self.db = FlotillaClientDynamo(self.units,
+        self.db = FlotillaClientDynamo(self.regions,
                                        self.revisions,
-                                       self.services)
+                                       self.services,
+                                       self.units)
 
     def test_add_revision(self):
         self.db.add_revision(SERVICE_NAME, self.revision)
@@ -116,3 +118,14 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.services.get_item.side_effect = ItemNotFound()
         revisions = self.db.get_revisions(SERVICE_NAME)
         self.assertEqual(0, len(revisions))
+
+    def test_configure_region_create(self):
+        self.db.configure_regions('us-east-1', {'az1': 'us-east-1a'})
+        self.regions.batch_write.assert_called_with()
+
+    def test_configure_region_exists(self):
+        self.regions.batch_get.return_value = [
+            {'region_name': 'us-east-1'}
+        ]
+        self.db.configure_regions('us-east-1', {'az1': 'us-east-1a'})
+        self.regions.batch_write.assert_called_with()

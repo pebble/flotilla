@@ -13,17 +13,14 @@
     },
     "Az1": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
-      "Default": "us-east-1a",
       "Description": "First AZ."
     },
     "Az2": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
-      "Default": "us-east-1c",
       "Description": "Second AZ."
     },
     "Az3": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
-      "Default": "us-east-1d",
       "Description": "Third AZ."
     }
   },

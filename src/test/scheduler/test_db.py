@@ -12,12 +12,14 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
     def setUp(self):
         self.assignments = MagicMock(spec=Table)
         self.assignments._dynamizer = MagicMock()
+        self.regions = MagicMock(spec=Table)
         self.services = MagicMock(spec=Table)
         self.stacks = MagicMock(spec=Table)
         self.status = MagicMock(spec=Table)
 
-        self.db = FlotillaSchedulerDynamo(self.assignments, self.services,
-                                          self.stacks, self.status)
+        self.db = FlotillaSchedulerDynamo(self.assignments, self.regions,
+                                          self.services, self.stacks,
+                                          self.status)
 
     def test_get_revision_weights_empty(self):
         weights = self.db.get_revision_weights()
@@ -96,5 +98,21 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assertEquals('fred', stacks[0]['service_name'])
 
     def test_set_stacks(self):
-        self.db.set_stacks([])
+        self.db.set_stacks([{'stack_arn': 'foo'}])
         self.stacks.batch_write.assert_called_with()
+
+    def test_get_region_params_empty(self):
+        region_params = self.db.get_region_params(['us-east-1'])
+        self.assertEqual(len(region_params), 1)
+        self.assertEqual(region_params['us-east-1'], {})
+
+    def test_get_region_params(self):
+        self.regions.batch_get.return_value = [
+            {'region_name': 'us-east-1', 'az1': 'us-east-1e'}
+        ]
+        region_params = self.db.get_region_params(['us-east-1', 'us-west-2'])
+
+        self.assertEqual(len(region_params), 2)
+        self.assertEqual(region_params['us-east-1'],
+                         {'region_name': 'us-east-1', 'az1': 'us-east-1e'})
+        self.assertEqual(region_params['us-west-2'], {})
