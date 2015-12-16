@@ -4,6 +4,8 @@ from flotilla.model import UNIT_PREFIX
 
 logger = logging.getLogger('flotilla')
 
+SYSTEMD_DEPS = ('Before', 'After', 'BindsTo', 'Wants', 'Requires')
+
 
 class SystemdUnits(object):
     def __init__(self, manager, unit_dir='/etc/systemd/system',
@@ -54,15 +56,24 @@ class SystemdUnits(object):
                 if os.path.isfile(env_path):
                     os.unlink(env_path)
 
-
+        unit_short_names = {unit.name: unit for unit in units}
         # Ensure desired units are loaded and started:
         for name, unit in unit_names.items():
             # Write unit file to disk:
             unit_path = os.path.join(self._unit_dir, name)
             if not os.path.exists(unit_path):
+                unit_lines = unit.unit_file.split('\n')
+                for line_num, unit_line in enumerate(unit_lines):
+                    line_split = unit_line.split('=')
+                    # Map systemd dependencies within the revision:
+                    if len(line_split) == 2 and line_split[0] in SYSTEMD_DEPS:
+                        unit = unit_short_names.get(line_split[1])
+                        if unit:
+                            unit_lines[line_num] = '%s=%s' % (line_split[0],
+                                                              unit.full_name)
                 logger.debug('Writing unit file: %s', unit_path)
                 with open(unit_path, 'w') as unit_file:
-                    unit_file.write(unit.unit_file)
+                    unit_file.write('\n'.join(unit_lines))
 
             # Write environment file to disk:
             if unit.environment:

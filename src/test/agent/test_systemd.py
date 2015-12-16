@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 import time
-from flotilla.model import FlotillaDockerService, UNIT_PREFIX
+from flotilla.model import FlotillaDockerService, FlotillaUnit, UNIT_PREFIX
 from flotilla.agent.systemd import SystemdUnits
 
 UNIT_NAME = '%smock.service' % UNIT_PREFIX
@@ -33,8 +33,6 @@ class TestSystemdUnits(unittest.TestCase):
 
         self.flotilla_unit = FlotillaDockerService('redis.service',
                                                    'redis:latest')
-
-
 
         self.unit_dir = tempfile.mkdtemp('flotilla-systemd-unit')
         self.env_dir = tempfile.mkdtemp('flotilla-systemd-env')
@@ -134,3 +132,16 @@ class TestSystemdUnits(unittest.TestCase):
         self.systemd.set_units([self.flotilla_unit])
 
         self.loaded_unit.start.assert_not_called()
+
+    def test_set_units_service_mapping(self):
+        depending_unit = FlotillaUnit('dependent.service', '''[Unit]
+After=redis.service
+''')
+        self.systemd.set_units([self.flotilla_unit, depending_unit])
+
+        unit_path = '%s/%s' % (self.unit_dir, depending_unit.full_name)
+        self.assertTrue(os.path.isfile(unit_path))
+        with open(unit_path) as unit_in:
+            unit_contents = unit_in.read()
+        self.assertFalse('redis.service' in unit_contents)
+        self.assertTrue(self.flotilla_unit.full_name in unit_contents)
