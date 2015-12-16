@@ -129,3 +129,18 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         ]
         self.db.configure_regions('us-east-1', {'az1': 'us-east-1a'})
         self.regions.batch_write.assert_called_with()
+
+    def test_configure_service_create(self):
+        self.services.get_item.return_value = None
+
+        self.db.configure_service(SERVICE_NAME, {'key': 'value'})
+
+        self.services.new_item.assert_called_with(service_name=SERVICE_NAME)
+
+    def test_configure_service_exists(self):
+        existing_service = MagicMock(spec=Item)
+        self.services.get_item.return_value = existing_service
+
+        self.db.configure_service(SERVICE_NAME, {'key': 'value'})
+
+        existing_service.save.assert_called_with()

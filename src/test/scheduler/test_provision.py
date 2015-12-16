@@ -1,13 +1,11 @@
 import unittest
 from mock import MagicMock, ANY
 from flotilla.scheduler.cloudformation import FlotillaCloudFormation
-from flotilla.scheduler.coreos import CoreOsAmiIndex
 from flotilla.scheduler.db import FlotillaSchedulerDynamo
 from flotilla.scheduler.provisioner import FlotillaProvisioner
 from flotilla.scheduler.scheduler import FlotillaScheduler
 
 ENVIRONMENT = 'test'
-DOMAIN = 'test.com'
 REGION = 'us-east-1'
 SERVICE = 'testapp'
 
@@ -18,10 +16,8 @@ class TestFlotillaProvisioner(unittest.TestCase):
         self.scheduler.active = True
         self.db = MagicMock(spec=FlotillaSchedulerDynamo)
         self.cloudformation = MagicMock(spec=FlotillaCloudFormation)
-        self.coreos = MagicMock(spec=CoreOsAmiIndex)
-        self.provisioner = FlotillaProvisioner(ENVIRONMENT, DOMAIN,
-                                               self.scheduler, self.db,
-                                               self.cloudformation, self.coreos)
+        self.provisioner = FlotillaProvisioner(ENVIRONMENT, self.scheduler,
+                                               self.db, self.cloudformation)
 
     def test_provision_not_active(self):
         self.scheduler.active = False
@@ -53,9 +49,10 @@ class TestFlotillaProvisioner(unittest.TestCase):
 
     def test_provision_with_region_vpc(self):
         self.mock_service()
+        vpc_outputs = {'VpcId': 'vpc-123456'}
         self.db.get_stacks.return_value = [
             {'region': REGION,
-             'outputs': {'VpcId': 'vpc-123456'}}
+             'outputs': vpc_outputs}
         ]
         self.provisioner._complete = MagicMock()
         self.provisioner._complete.side_effect = [True, False]
@@ -63,7 +60,8 @@ class TestFlotillaProvisioner(unittest.TestCase):
         self.provisioner.provision()
 
         self.cloudformation.vpc.assert_not_called()
-        self.cloudformation.service.assert_called_with(REGION, SERVICE, ANY)
+        self.cloudformation.service.assert_called_with(REGION, self.service,
+                                                       vpc_outputs)
         self.db.set_stacks.assert_called_with(ANY)
 
     def test_provision_existing(self):
@@ -112,28 +110,6 @@ class TestFlotillaProvisioner(unittest.TestCase):
         stack = {'stack_hash': 'foo', 'outputs': {'foo': 'bar'}}
         self.assertTrue(self.provisioner._complete(stack, 'foo'))
 
-    def test_stack_params_generate_dns(self):
-        service = {
-            'service_name': SERVICE
-        }
-
-        stack_params = self.provisioner._stack_params(REGION, service, {})
-        print stack_params
-        self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
-        self.assertEqual(stack_params['VirtualHost'], 'testapp-test.test.com')
-
-    def test_stack_params_dns_parameter(self):
-        service = {
-            'service_name': SERVICE,
-            'dns_name': 'testapp.test.com'
-        }
-
-        stack_params = self.provisioner._stack_params(REGION, service, {})
-        self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
-        self.assertEqual(stack_params['VirtualHost'], 'testapp.test.com')
-
     def mock_service(self):
-        self.db.services.return_value = [
-            {'service_name': SERVICE,
-             'regions': [REGION]}
-        ]
+        self.service = {'service_name': SERVICE, 'regions': [REGION]}
+        self.db.services.return_value = [self.service]

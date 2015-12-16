@@ -11,6 +11,11 @@ DONE_STATES = ('CREATE_COMPLETE',
                'UPDATE_COMPLETE',
                'UPDATE_ROLLBACK_COMPLETE')
 
+FORWARD_FIELDS = ['VpcId', 'NatSecurityGroup']
+for i in range(1, 4):
+    FORWARD_FIELDS.append('PublicSubnet0%d' % i)
+    FORWARD_FIELDS.append('PrivateSubnet0%d' % i)
+
 
 def sha256(val, params={}):
     hasher = hashlib.sha256()
@@ -22,9 +27,11 @@ def sha256(val, params={}):
 
 
 class FlotillaCloudFormation(object):
-    def __init__(self, environment):
+    def __init__(self, environment, domain, coreos):
         self._clients = {}
         self._environment = environment
+        self._domain = domain
+        self._coreos = coreos
         with open('cloudformation/vpc.template') as template_in:
             self._vpc = template_in.read()
         with open('cloudformation/service-elb.template') as template_in:
@@ -40,18 +47,67 @@ class FlotillaCloudFormation(object):
         name = 'flotilla-{0}-vpc'.format(self._environment)
         return self._stack(region, name, self._vpc, params)
 
-    def service(self, region, name, params):
+    def _vpc_params(self, region_name, region):
+        nat_coreos_channel = region.get('nat_coreos_channel', 'stable')
+        nat_coreos_version = region.get('nat_coreos_version', 'current')
+        nat_ami = self._coreos.get_ami(nat_coreos_channel, nat_coreos_version,
+                                       region_name)
+        nat_instance_type = region.get('nat_instance_type', 't2.nano')
+
+        az1 = region.get('az1', '%sa' % region_name)
+        az2 = region.get('az2', '%sb' % region_name)
+        az3 = region.get('az3', '%sc' % region_name)
+
+        return {
+            'NatInstanceType': nat_instance_type,
+            'NatAmi': nat_ami,
+            'Az1': az1,
+            'Az2': az2,
+            'Az3': az3
+        }
+
+    def service(self, region, service, vpc_outputs):
         """
         Create stack for service.
         :param region: Region.
-        :param name: Service name.
-        :param params: Service stack parameters.
+        :param service: Service.
+        :param vpc_outputs: VPC stack outputs.
         :return: CloudFormation Stack
         """
-        name = 'flotilla-{0}-{1}'.format(self._environment, name)
-        return self._stack(region, name, self._service_elb, params)
+        name = 'flotilla-{0}-{1}'.format(self._environment,
+                                         service['service_name'])
+        service_params = self._service_params(region, service, vpc_outputs)
+        return self._stack(region, name, self._service_elb, service_params)
 
-    def _stack(self, region, name, template, params=None):
+    def _service_params(self, region, service, vpc_outputs):
+        service_name = service['service_name']
+        service_params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
+        service_params['FlotillaEnvironment'] = self._environment
+        service_params['ServiceName'] = service_name
+        # FIXME: HA by default, don't be cheap
+        service_params['InstanceType'] = service.get('instance_type', 't2.nano')
+        service_params['InstanceMin'] = service.get('instance_min', '1')
+        service_params['InstanceMax'] = service.get('instance_max', '1')
+
+        dns_name = service.get('dns_name')
+        if dns_name:
+            domain = dns_name.split('.')
+            domain = '.'.join(domain[-2:]) + '.'
+            service_params['VirtualHostDomain'] = domain
+            service_params['VirtualHost'] = dns_name
+        else:
+            service_params['VirtualHostDomain'] = self._domain + '.'
+            generated_dns = '%s-%s.%s' % (service_name, self._environment,
+                                          self._domain)
+            service_params['VirtualHost'] = generated_dns
+
+        coreos_channel = service.get('coreos_channel', 'stable')
+        coreos_version = service.get('coreos_version', 'current')
+        ami = self._coreos.get_ami(coreos_channel, coreos_version, region)
+        service_params['Ami'] = ami
+        return service_params
+
+    def _stack(self, region, name, template, params):
         """
         Create/update CloudFormation stack if possible.
         :param region: Region.
@@ -106,12 +162,15 @@ class FlotillaCloudFormation(object):
         """
         return sha256(self._vpc, params)
 
-    def service_hash(self, params):
+    def service_hash(self, service, vpc_outputs):
         """
         Get hash for service template with given parameters.
-        :param params: Service parameters
+        :param service: Service item.
+        :param vpc_outputs: Parent VPC outputs.
         :return: Hash.
         """
+        params = dict(vpc_outputs)
+        # TODO: copy service params into hash
         return sha256(self._service_elb, params)
 
     def _client(self, region):

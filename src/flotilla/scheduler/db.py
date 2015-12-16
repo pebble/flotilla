@@ -7,6 +7,13 @@ logger = logging.getLogger('flotilla')
 
 INSTANCE_EXPIRY = 300
 
+SERVICE_FIELDS = set([
+    'service_name',
+    'regions',
+    'public_ports',
+    'private_ports'
+])
+
 
 class FlotillaSchedulerDynamo(object):
     def __init__(self, assignments, regions, services, stacks, status):
@@ -25,12 +32,10 @@ class FlotillaSchedulerDynamo(object):
         services = {}
         rev_count = 0
         for service in self.services():
-            service = dict(service)
             name = service['service_name']
-            del service['service_name']
-            service.pop('regions', None)
 
-            service_revs = {k: int(v) for k, v in service.items()}
+            service_revs = {k: int(v) for k, v in service.items()
+                            if k not in SERVICE_FIELDS}
             services[name] = service_revs
             rev_count += len(service_revs)
 

@@ -4,8 +4,10 @@ from boto.exception import BotoServerError
 from boto.cloudformation.connection import CloudFormationConnection
 from boto.cloudformation.stack import Stack
 from flotilla.scheduler.cloudformation import FlotillaCloudFormation
+from flotilla.scheduler.coreos import CoreOsAmiIndex
 
 ENVIRONMENT = 'test'
+DOMAIN = 'test.com'
 NAME = 'service'
 REGION = 'us-east-1'
 STACK_ARN = 'stack_arn'
@@ -18,7 +20,11 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.stack = MagicMock(spec=Stack)
         self.stack.stack_status = 'CREATE_COMPLETE'
         self.cloudformation.describe_stacks.return_value = [self.stack]
-        self.cf = FlotillaCloudFormation(ENVIRONMENT)
+        self.coreos = MagicMock(spec=CoreOsAmiIndex)
+        self.service = {
+            'service_name': NAME
+        }
+        self.cf = FlotillaCloudFormation(ENVIRONMENT, DOMAIN, self.coreos)
 
     @patch('boto.cloudformation.connect_to_region')
     def test_client_cache(self, mock_connect):
@@ -31,7 +37,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.assertEqual(self.cloudformation, self.cf._clients[REGION])
 
     def test_service_hash(self):
-        service_hash = self.cf.service_hash({'foo': 'bar'})
+        service_hash = self.cf.service_hash(self.service, {'foo': 'bar'})
         self.assertIsNotNone(service_hash)
 
     def test_vpc_hash(self):
@@ -100,10 +106,22 @@ class TestFlotillaCloudFormation(unittest.TestCase):
     def test_service(self):
         self.cf._stack = MagicMock()
 
-        self.cf.service(REGION, NAME, {})
+        self.cf.service(REGION, self.service, {})
 
         self.cf._stack.assert_called_with(REGION, 'flotilla-test-service',
-                                          self.cf._service_elb, {})
+                                          self.cf._service_elb, ANY)
+
+    def test_service_params_generate_dns(self):
+        stack_params = self.cf._service_params(REGION, self.service, {})
+        self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
+        self.assertEqual(stack_params['VirtualHost'], 'service-test.test.com')
+
+    def test_service_params_dns_parameter(self):
+        self.service['dns_name'] = 'testapp.test.com'
+
+        stack_params = self.cf._service_params(REGION, self.service, {})
+        self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
+        self.assertEqual(stack_params['VirtualHost'], 'testapp.test.com')
 
     def test_vpc(self):
         self.cf._stack = MagicMock()
@@ -112,6 +130,12 @@ class TestFlotillaCloudFormation(unittest.TestCase):
 
         self.cf._stack.assert_called_with(REGION, 'flotilla-test-vpc',
                                           self.cf._vpc, {})
+
+    def test_vpc_params_empty(self):
+        params = self.cf._vpc_params(REGION, {})
+        self.assertEqual(params['Az1'], 'us-east-1a')
+        self.assertEqual(params['Az2'], 'us-east-1b')
+        self.assertEqual(params['Az3'], 'us-east-1c')
 
     def mock_client(self):
         self.cf._client = MagicMock(return_value=self.cloudformation)

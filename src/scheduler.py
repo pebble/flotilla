@@ -28,13 +28,13 @@ if __name__ == '__main__':
                                  tables.services, tables.stacks, tables.status)
     locks = DynamoDbLocks(instance_id, tables.locks)
 
-    cloudformation = FlotillaCloudFormation(environment)
     coreos = CoreOsAmiIndex()
+    cloudformation = FlotillaCloudFormation(environment, domain, coreos)
 
     # Assemble into scheduler:
     scheduler = FlotillaScheduler(db, locks, lock_ttl=45)
-    provisioner = FlotillaProvisioner(environment, domain, scheduler, db,
-                                      cloudformation, coreos)
+    provisioner = FlotillaProvisioner(environment, scheduler, db,
+                                      cloudformation)
 
     # Start loops:
     funcs = [

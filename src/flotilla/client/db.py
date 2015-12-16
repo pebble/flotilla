@@ -152,3 +152,11 @@ class FlotillaClientDynamo(object):
         with self._regions.batch_write() as batch:
             for region_item in region_items.values():
                 batch.put_item(region_item)
+
+    def configure_service(self, service, updates):
+        service_item = self._services.get_item(service_name=service)
+        if not service_item:
+            service_item = self._services.new_item(service_name=service)
+        for key, value in updates.items():
+            service_item[key] = value
+        service_item.save()

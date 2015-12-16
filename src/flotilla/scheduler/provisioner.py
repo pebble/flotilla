@@ -3,21 +3,13 @@ from collections import defaultdict
 
 logger = logging.getLogger('flotilla')
 
-FORWARD_FIELDS = ['VpcId', 'NatSecurityGroup']
-for i in range(1, 4):
-    FORWARD_FIELDS.append('PublicSubnet0%d' % i)
-    FORWARD_FIELDS.append('PrivateSubnet0%d' % i)
-
 
 class FlotillaProvisioner(object):
-    def __init__(self, environment, domain, scheduler, db, cloudformation,
-                 coreos):
+    def __init__(self, environment, scheduler, db, cloudformation):
         self._environment = environment
-        self._domain = domain
         self._scheduler = scheduler
         self._db = db
         self._cloudformation = cloudformation
-        self._coreos = coreos
 
     def provision(self):
         if not self._scheduler.active:
@@ -61,7 +53,7 @@ class FlotillaProvisioner(object):
         region_params = self._db.get_region_params(region_stacks.keys())
         for region_name, stack in region_stacks.items():
             region = region_params[region_name]
-            vpc_params = self._vpc_params(region_name, region)
+            vpc_params = self._cloudformation._vpc_params(region_name, region)
             vpc_hash = self._cloudformation.vpc_hash(vpc_params)
             if not self._complete(stack, vpc_hash):
                 service_stack = self._cloudformation.vpc(region_name,
@@ -86,12 +78,12 @@ class FlotillaProvisioner(object):
 
             for service_name, stack in region_services.items():
                 service = services[service_name]
-                stack_params = self._stack_params(region, service, vpc_outputs)
-                service_hash = self._cloudformation.service_hash(stack_params)
+                service_hash = self._cloudformation.service_hash(service,
+                                                                 vpc_outputs)
                 if not self._complete(stack, service_hash):
                     service_stack = self._cloudformation.service(region,
-                                                                 service_name,
-                                                                 stack_params)
+                                                                 service,
+                                                                 vpc_outputs)
                     stack_outputs = {o.key: o.value for o in
                                      service_stack.outputs}
                     stack = {'stack_arn': service_stack.stack_id,
@@ -108,53 +100,6 @@ class FlotillaProvisioner(object):
         # Store updates to DB:
         if changed_stacks:
             self._db.set_stacks(changed_stacks)
-
-    def _vpc_params(self, region_name, region):
-        nat_coreos_channel = region.get('nat_coreos_channel', 'stable')
-        nat_coreos_version = region.get('nat_coreos_version', 'current')
-        nat_ami = self._coreos.get_ami(nat_coreos_channel, nat_coreos_version,
-                                       region_name)
-        nat_instance_type = region.get('nat_instance_type', 't2.nano')
-
-        az1 = region.get('az1', '%sa' % region_name)
-        az2 = region.get('az2', '%sb' % region_name)
-        az3 = region.get('az3', '%sc' % region_name)
-
-        return {
-            'NatInstanceType': nat_instance_type,
-            'NatAmi': nat_ami,
-            'Az1': az1,
-            'Az2': az2,
-            'Az3': az3
-        }
-
-    def _stack_params(self, region, service, vpc_outputs):
-        service_name = service['service_name']
-        stack_params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
-        stack_params['FlotillaEnvironment'] = self._environment
-        stack_params['ServiceName'] = service_name
-        stack_params['InstanceType'] = service.get('instance_type', 't2.nano')
-        # FIXME: HA by default, don't be cheap
-        stack_params['InstanceMin'] = service.get('instance_min', '1')
-        stack_params['InstanceMax'] = service.get('instance_max', '1')
-
-        dns_name = service.get('dns_name')
-        if dns_name:
-            domain = dns_name.split('.')
-            domain = '.'.join(domain[-2:]) + '.'
-            stack_params['VirtualHostDomain'] = domain
-            stack_params['VirtualHost'] = dns_name
-        else:
-            stack_params['VirtualHostDomain'] = self._domain + '.'
-            generated_dns = '%s-%s.%s' % (service_name, self._environment,
-                                          self._domain)
-            stack_params['VirtualHost'] = generated_dns
-
-        coreos_channel = service.get('coreos_channel', 'stable')
-        coreos_version = service.get('coreos_version', 'current')
-        ami = self._coreos.get_ami(coreos_channel, coreos_version, region)
-        stack_params['Ami'] = ami
-        return stack_params
 
     @staticmethod
     def _complete(stack, expected_hash):
