@@ -40,7 +40,17 @@
       }
     },
     "InternetGateway": {
-      "Type": "AWS::EC2::InternetGateway"
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "igw"]]
+            }
+          }
+        ]
+      }
     },
     "AttachGateway": {
       "Type": "AWS::EC2::VPCGatewayAttachment",
@@ -103,7 +113,13 @@
         "VpcId": {"Ref": "VPC"},
         "Tags": [
           {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
-          {"Key": "Network", "Value": "Public"}
+          {"Key": "Network", "Value": "Public"},
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "public"]]
+            }
+          }
         ]
       }
     },
@@ -202,7 +218,13 @@
         "VpcId": {"Ref": "VPC"},
         "Tags": [
           {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
-          {"Key": "Network", "Value": "Private"}
+          {"Key": "Network", "Value": "Private"},
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "private"]]
+            }
+          }
         ]
       }
     },
