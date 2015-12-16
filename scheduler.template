@@ -49,7 +49,7 @@
           {
             "Key": "Name",
             "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "vpc"]]
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "scheduler", "vpc"]]
             }
           }
         ]
@@ -179,7 +179,7 @@
         },
         "Policies": [
           {
-            "PolicyName": "FlotillaDynamo",
+            "PolicyName": "FlotillaCloudFormation",
             "PolicyDocument": {
               "Statement": [
                 {
@@ -188,6 +188,70 @@
                     "cloudformation:CreateStack",
                     "cloudformation:DescribeStacks",
                     "cloudformation:UpdateStack"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "autoscaling:CreateAutoScalingGroup",
+                    "autoscaling:CreateLaunchConfiguration",
+                    "autoscaling:DeleteAutoScalingGroup",
+                    "autoscaling:DeleteLaunchConfiguration",
+                    "autoscaling:DescribeAutoScalingGroups",
+                    "autoscaling:DescribeLaunchConfigurations",
+                    "autoscaling:DescribeScalingActivities",
+                    "autoscaling:UpdateAutoScalingGroup",
+                    "ec2:AssociateRouteTable",
+                    "ec2:AttachInternetGateway",
+                    "ec2:AuthorizeSecurityGroupEgress",
+                    "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:CreateInternetGateway",
+                    "ec2:CreateRoute",
+                    "ec2:CreateRouteTable",
+                    "ec2:CreateSecurityGroup",
+                    "ec2:CreateSubnet",
+                    "ec2:CreateTags",
+                    "ec2:CreateVpc",
+                    "ec2:DeleteInternetGateway",
+                    "ec2:DeleteRoute",
+                    "ec2:DeleteRouteTable",
+                    "ec2:DeleteSecurityGroup",
+                    "ec2:DeleteSubnet",
+                    "ec2:DeleteVpc",
+                    "ec2:DescribeAvailabilityZones",
+                    "ec2:DescribeImages",
+                    "ec2:DescribeInternetGateways",
+                    "ec2:DescribeRouteTables",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeVpcs",
+                    "ec2:DetachInternetGateway",
+                    "ec2:DisassociateRouteTable",
+                    "ec2:ModifyVpcAttribute",
+                    "ec2:RevokeSecurityGroupEgress",
+                    "ec2:RevokeSecurityGroupIngress",
+                    "elasticloadbalancing:ConfigureHealthCheck",
+                    "elasticloadbalancing:CreateLoadBalancer",
+                    "elasticloadbalancing:CreateLoadBalancerListeners",
+                    "elasticloadbalancing:DeleteLoadBalancer",
+                    "elasticloadbalancing:DeleteLoadBalancerListeners",
+                    "elasticloadbalancing:DescribeLoadBalancers",
+                    "elasticloadbalancing:ModifyLoadBalancerAttributes",
+                    "elasticloadbalancing:SetLoadBalancerPoliciesOfListener",
+                    "iam:AddRoleToInstanceProfile",
+                    "iam:CreateRole",
+                    "iam:CreateInstanceProfile",
+                    "iam:DeleteInstanceProfile",
+                    "iam:DeleteRole",
+                    "iam:DeleteRolePolicy",
+                    "iam:PassRole",
+                    "iam:PutRolePolicy",
+                    "iam:RemoveRoleFromInstanceProfile",
+                    "route53:ChangeResourceRecordSets",
+                    "route53:GetChange",
+                    "route53:ListHostedZones",
+                    "route53:ListResourceRecordSets"
                   ],
                   "Resource": "*"
                 }
@@ -223,23 +287,63 @@
                   "Effect": "Allow",
                   "Action": [
                     "dynamodb:PutItem",
+                    "dynamodb:BatchGetItem",
                     "dynamodb:BatchWriteItem"
                   ],
-                  "Resource": [
-                    {
-                      "Fn::Join": [
-                        "", [
-                          "arn:aws:dynamodb:",
-                          {"Ref": "AWS::Region"},
-                          ":",
-                          {"Ref": "AWS::AccountId"},
-                          ":table/flotilla-",
-                          {"Ref": "FlotillaEnvironment"},
-                          "-assignments"
-                        ]
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-assignments"
                       ]
-                    }
-                  ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DeleteItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-locks"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:BatchGetItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-regions"
+                      ]
+                    ]
+                  }
                 },
                 {
                   "Effect": "Allow",
@@ -265,81 +369,44 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:Query"
-                  ],
-                  "Resource": [
-                    {
-                      "Fn::Join": [
-                        "", [
-                          "arn:aws:dynamodb:",
-                          {"Ref": "AWS::Region"},
-                          ":",
-                          {"Ref": "AWS::AccountId"},
-                          ":table/flotilla-",
-                          {"Ref": "FlotillaEnvironment"},
-                          "-status"
-                        ]
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "Effect": "Allow",
-                  "Action": [
                     "dynamodb:DeleteItem",
                     "dynamodb:GetItem",
                     "dynamodb:PutItem",
-                    "dynamodb:UpdateItem"
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Scan"
                   ],
-                  "Resource": [
-                    {
-                      "Fn::Join": [
-                        "", [
-                          "arn:aws:dynamodb:",
-                          {"Ref": "AWS::Region"},
-                          ":",
-                          {"Ref": "AWS::AccountId"},
-                          ":table/flotilla-",
-                          {"Ref": "FlotillaEnvironment"},
-                          "-locks"
-                        ]
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-stacks"
                       ]
-                    },
-                    {
-                      "Fn::Join": [
-                        "", [
-                          "arn:aws:dynamodb:",
-                          {"Ref": "AWS::Region"},
-                          ":",
-                          {"Ref": "AWS::AccountId"},
-                          ":table/flotilla-",
-                          {"Ref": "FlotillaEnvironment"},
-                          "-stacks"
-                        ]
-                      ]
-                    }
-                  ]
+                    ]
+                  }
                 },
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:BatchGetItem"
+                    "dynamodb:Query"
                   ],
-                  "Resource": [
-                    {
-                      "Fn::Join": [
-                        "", [
-                          "arn:aws:dynamodb:",
-                          {"Ref": "AWS::Region"},
-                          ":",
-                          {"Ref": "AWS::AccountId"},
-                          ":table/flotilla-",
-                          {"Ref": "FlotillaEnvironment"},
-                          "-regions"
-                        ]
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-status"
                       ]
-                    }
-                  ]
+                    ]
+                  }
                 }
               ]
             }

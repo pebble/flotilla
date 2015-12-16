@@ -34,9 +34,7 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "vpc"]]
-            }
+            "Value": {"Ref": "AWS::StackName"}
           }
         ]
       }
