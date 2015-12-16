@@ -29,6 +29,7 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.services.scan.return_value = [
             {
                 'service_name': SERVICE,
+                'regions': ['us-east-1'],
                 REVISION: 1,
                 'rev2': 2
             },

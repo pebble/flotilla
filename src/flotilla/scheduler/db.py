@@ -22,8 +22,10 @@ class FlotillaSchedulerDynamo(object):
         services = {}
         rev_count = 0
         for service in self.services():
+            service = dict(service)
             name = service['service_name']
             del service['service_name']
+            service.pop('regions', None)
 
             service_revs = {k: int(v) for k, v in service.items()}
             services[name] = service_revs
