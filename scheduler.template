@@ -286,9 +286,10 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:PutItem",
                     "dynamodb:BatchGetItem",
-                    "dynamodb:BatchWriteItem"
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:PutItem"
                   ],
                   "Resource": {
                     "Fn::Join": [
@@ -393,6 +394,8 @@
                 {
                   "Effect": "Allow",
                   "Action": [
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DeleteItem",
                     "dynamodb:Query"
                   ],
                   "Resource": {

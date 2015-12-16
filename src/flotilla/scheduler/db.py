@@ -1,8 +1,11 @@
 import logging
+import time
 from boto.dynamodb2.items import Item
 from collections import defaultdict
 
 logger = logging.getLogger('flotilla')
+
+INSTANCE_EXPIRY = 300
 
 
 class FlotillaSchedulerDynamo(object):
@@ -68,18 +71,36 @@ class FlotillaSchedulerDynamo(object):
         :param service:  Service name.
         :return: Map of instances of assignments (None if unassigned).
         """
-        instances = [i['instance_id'] for i in
-                     self._status.query_2(service__eq=service,
-                                          attributes=('instance_id',))]
+        live_instances = []
+        dead_instances = []
+        dead_cutoff = time.time() - INSTANCE_EXPIRY
+        for instance_status in self._status.query_2(service__eq=service,
+                                                    attributes=('instance_id',
+                                                                'status_time')):
+            instance_id = instance_status['instance_id']
+            if instance_status['status_time'] < dead_cutoff:
+                dead_instances.append(instance_id)
+            else:
+                live_instances.append(instance_id)
+
+        if dead_instances:
+            logger.debug('Removing %d dead instances.', len(dead_instances))
+            with self._status.batch_write() as status_batch:
+                for dead_instance in dead_instances:
+                    status_batch.delete_item(service=service,
+                                             instance_id=dead_instance)
+            with self._assignments.batch_write() as assignment_batch:
+                for dead_instance in dead_instances:
+                    assignment_batch.delete_item(instance_id=dead_instance)
 
         assignments = defaultdict(list)
-        if not instances:
+        if not live_instances:
             return assignments
 
-        unassigned = set(instances)
-        for assignment in self._assignments.batch_get(
-                keys=[{'instance_id': i} for i in instances],
-                attributes=('instance_id', 'assignment')):
+        unassigned = set(live_instances)
+        keys = [{'instance_id': i} for i in live_instances]
+        for assignment in self._assignments.batch_get(keys=keys, attributes=(
+                'instance_id', 'assignment')):
             assigned = assignment['assignment']
             instance_id = assignment['instance_id']
             unassigned.remove(instance_id)

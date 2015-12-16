@@ -1,6 +1,7 @@
 import unittest
 from mock import MagicMock, ANY
-from flotilla.scheduler.db import FlotillaSchedulerDynamo
+import time
+from flotilla.scheduler.db import FlotillaSchedulerDynamo, INSTANCE_EXPIRY
 from boto.dynamodb2.table import Table, BatchTable
 
 SERVICE = 'test'
@@ -71,7 +72,8 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
 
     def test_get_instance_assignments_assigned(self):
         self.status.query_2.return_value = [{
-            'instance_id': INSTANCE_ID
+            'instance_id': INSTANCE_ID,
+            'status_time': time.time()
         }]
         self.assignments.batch_get.return_value = [{
             'instance_id': INSTANCE_ID,
@@ -83,10 +85,23 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
 
     def test_get_instance_assignments_unassigned(self):
         self.status.query_2.return_value = [{
-            'instance_id': INSTANCE_ID
+            'instance_id': INSTANCE_ID,
+            'status_time': time.time()
         }]
         assignments = self.db.get_instance_assignments(SERVICE)
         self.assertEqual(1, len(assignments[None]))
+
+    def test_get_instance_assignments_garbage_collection(self):
+        self.status.query_2.return_value = [{
+            'instance_id': INSTANCE_ID,
+            'status_time': time.time() - (INSTANCE_EXPIRY + 1)
+        }]
+
+        assignments = self.db.get_instance_assignments(SERVICE)
+
+        self.assertEqual(0, len(assignments))
+        self.status.batch_write.assert_called_with()
+        self.assignments.batch_write.assert_called_with()
 
     def test_get_stacks_empty(self):
         stacks = self.db.get_stacks()
