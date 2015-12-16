@@ -120,7 +120,7 @@ class TestFlotillaProvisioner(unittest.TestCase):
         stack_params = self.provisioner._stack_params(REGION, service, {})
         print stack_params
         self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
-        self.assertEqual(stack_params['VirtualHost'], 'testapp-test.test.com.')
+        self.assertEqual(stack_params['VirtualHost'], 'testapp-test.test.com')
 
     def test_stack_params_dns_parameter(self):
         service = {
@@ -130,7 +130,7 @@ class TestFlotillaProvisioner(unittest.TestCase):
 
         stack_params = self.provisioner._stack_params(REGION, service, {})
         self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
-        self.assertEqual(stack_params['VirtualHost'], 'testapp.test.com.')
+        self.assertEqual(stack_params['VirtualHost'], 'testapp.test.com')
 
     def mock_service(self):
         self.db.services.return_value = [

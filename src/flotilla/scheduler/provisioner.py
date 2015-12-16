@@ -143,11 +143,11 @@ class FlotillaProvisioner(object):
             domain = dns_name.split('.')
             domain = '.'.join(domain[-2:]) + '.'
             stack_params['VirtualHostDomain'] = domain
-            stack_params['VirtualHost'] = dns_name + '.'
+            stack_params['VirtualHost'] = dns_name
         else:
             stack_params['VirtualHostDomain'] = self._domain + '.'
-            generated_dns = '%s-%s.%s.' % (service_name, self._environment,
-                                           self._domain)
+            generated_dns = '%s-%s.%s' % (service_name, self._environment,
+                                          self._domain)
             stack_params['VirtualHost'] = generated_dns
 
         coreos_channel = service.get('coreos_channel', 'stable')
