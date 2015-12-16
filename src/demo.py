@@ -44,23 +44,34 @@ def sync_cloudformation(cloudformation):
 
 
 if __name__ == '__main__':
-    # dynamo = boto.dynamodb2.connect_to_region('us-east-1')
-    # tables = DynamoDbTables(dynamo, environment='develop')
-    # tables.setup(['regions', 'revisions', 'services', 'units'])
-    # db = FlotillaClientDynamo(tables.regions, tables.revisions, tables.services,
-    #                           tables.units)
-    #
-    # v3_noconfig = FlotillaDockerService('echo.service',
-    #                                     'pwagner/http-env-echo:3.0.0',
-    #                                     ports={80: 8080},
-    #                                     environment={'MESSAGE': 'test'})
-    # db.add_revision('hello', FlotillaServiceRevision(label='initial',
-    #                                                    units=[v3_noconfig]))
+    dynamo = boto.dynamodb2.connect_to_region('us-east-1')
+    tables = DynamoDbTables(dynamo, environment='develop')
+    tables.setup(['regions', 'revisions', 'services', 'units'])
+    db = FlotillaClientDynamo(tables.regions, tables.revisions, tables.services,
+                              tables.units)
+
+    # Define ElasticSearch ports:
+    db.configure_service('elasticsearch', {
+        'regions': ['us-east-1'],
+        'public_ports': {9200: 'HTTP'},
+        'private_ports': {9300: ['TCP']},
+        'health_check': 'HTTP:9200/',
+        'instance_type': 't2.small',
+        'elb_scheme': 'internal'
+    })
+
+    # Register initial revision of service:
+    elasticsearch = FlotillaDockerService('elasticsearch.service',
+                                          'pwagner/elasticsearch-aws:latest',
+                                          ports={9200: 9200, 9300: 9300})
+    db.add_revision('elasticsearch',
+                    FlotillaServiceRevision(label='initial',
+                                            units=[elasticsearch]))
+
+
+
 
     # db.configure_regions(['us-west-2', 'us-east-1'], nat_coreos_channel='stable')
 
-    cloudformation = boto.cloudformation.connect_to_region('us-east-1')
-    cf_stack = sync_cloudformation(cloudformation)
-    # outputs = {output.key: output.value for output in cf_stack.outputs}
-    # elb_address = 'http://{0}'.format(outputs['ElbAddress'])
-    # print elb_address
+    # cloudformation = boto.cloudformation.connect_to_region('us-east-1')
+    # cf_stack = sync_cloudformation(cloudformation)

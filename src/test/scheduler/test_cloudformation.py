@@ -109,7 +109,25 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf.service(REGION, self.service, {})
 
         self.cf._stack.assert_called_with(REGION, 'flotilla-test-service',
-                                          self.cf._service_elb, ANY)
+                                          ANY, ANY)
+
+    def test_service_public_ports(self):
+        self.cf._stack = MagicMock()
+        self.service['public_ports'] = {'9200': 'HTTP'}
+
+        self.cf.service(REGION, self.service, {})
+
+        self.cf._stack.assert_called_with(REGION, 'flotilla-test-service',
+                                          ANY, ANY)
+
+    def test_service_private_ports(self):
+        self.cf._stack = MagicMock()
+        self.service['private_ports'] = {'9300': ['TCP']}
+
+        self.cf.service(REGION, self.service, {})
+
+        self.cf._stack.assert_called_with(REGION, 'flotilla-test-service',
+                                          ANY, ANY)
 
     def test_service_params_generate_dns(self):
         stack_params = self.cf._service_params(REGION, self.service, {})

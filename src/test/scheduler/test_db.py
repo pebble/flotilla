@@ -6,7 +6,7 @@ from boto.dynamodb2.table import Table, BatchTable
 
 SERVICE = 'test'
 INSTANCE_ID = 'i-123456'
-REVISION = 'rev1'
+REVISION = 'bcb466627018c702f80ad70f8eabb3cc1c19045b8c951b29b19422ebd82ae247'
 
 
 class TestFlotillaSchedulerDynamo(unittest.TestCase):
@@ -27,17 +27,20 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assertEqual(0, len(weights))
 
     def test_get_revision_weights(self):
+        rev2 = REVISION.replace('a', 'b')
+        rev3 = REVISION.replace('a', 'c')
+        rev4 = REVISION.replace('a', 'd')
         self.services.scan.return_value = [
             {
                 'service_name': SERVICE,
                 'regions': ['us-east-1'],
                 REVISION: 1,
-                'rev2': 2
+                rev2: 2
             },
             {
                 'service_name': 'test2',
-                'rev3': 1,
-                'rev4': 2
+                rev3: 1,
+                rev4: 2
             }
         ]
 
@@ -46,11 +49,11 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
 
         service_test = weights[SERVICE]
         self.assertEqual(1, service_test[REVISION])
-        self.assertEqual(2, service_test['rev2'])
+        self.assertEqual(2, service_test[rev2])
 
         service_test = weights['test2']
-        self.assertEqual(1, service_test['rev3'])
-        self.assertEqual(2, service_test['rev4'])
+        self.assertEqual(1, service_test[rev3])
+        self.assertEqual(2, service_test[rev4])
 
     def test_set_assignment(self):
         self.db.set_assignment(SERVICE, INSTANCE_ID, REVISION)

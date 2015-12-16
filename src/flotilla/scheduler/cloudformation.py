@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import boto.cloudformation
 from boto.cloudformation.stack import Stack
@@ -77,7 +78,68 @@ class FlotillaCloudFormation(object):
         name = 'flotilla-{0}-{1}'.format(self._environment,
                                          service['service_name'])
         service_params = self._service_params(region, service, vpc_outputs)
-        return self._stack(region, name, self._service_elb, service_params)
+
+        json_template = json.loads(self._service_elb)
+        resources = json_template['Resources']
+
+        # Public ports are exposed to ELB, as a listener by ELB:
+        public_ports = service.get('public_ports')
+        if public_ports:
+            listeners = []
+            elb_ingress = []
+            instance_ingress = [{
+                'IpProtocol': 'tcp',
+                'FromPort': 22,
+                'ToPort': 22,
+                'SourceSecurityGroupId': {'Ref': 'NatSecurityGroup'}
+            }]
+            for port, protocol in public_ports.items():
+                listeners.append({
+                    'InstancePort': port,
+                    'LoadBalancerPort': port,
+                    'Protocol': protocol,
+                    'InstanceProtocol': "HTTP"
+                })
+                # TODO: support proto=HTTPS
+
+                elb_ingress.append({
+                    'IpProtocol': 'tcp',
+                    'FromPort': port,
+                    'ToPort': port,
+                    'CidrIp': '0.0.0.0/0'
+                })
+                instance_ingress.append({
+                    'IpProtocol': 'tcp',
+                    'FromPort': port,
+                    'ToPort': port,
+                    'SourceSecurityGroupId': {'Ref': 'ElbSg'}
+                })
+
+            resources['Elb']['Properties']['Listeners'] = listeners
+            elb_sg = resources['ElbSg']['Properties']
+            elb_sg['SecurityGroupIngress'] = elb_ingress
+            instance_sg = resources['InstanceSg']['Properties']
+            instance_sg['SecurityGroupIngress'] = instance_ingress
+
+        # Private ports can be used between instances:
+        private_ports = service.get('private_ports')
+        if private_ports:
+            for private_port, protocols in private_ports.items():
+                for protocol in protocols:
+                    port_resource = 'PrivatePort%s%s' % (private_port, protocol)
+                    resources[port_resource] = {
+                        'Type': 'AWS::EC2::SecurityGroupIngress',
+                        'Properties': {
+                            'GroupId': {'Ref': 'InstanceSg'},
+                            'IpProtocol': protocol,
+                            'FromPort': private_port,
+                            'ToPort': private_port,
+                            'SourceSecurityGroupId': {'Ref': 'InstanceSg'}
+                        }
+                    }
+
+        return self._stack(region, name, json.dumps(json_template),
+                           service_params)
 
     def _service_params(self, region, service, vpc_outputs):
         service_name = service['service_name']
@@ -88,6 +150,10 @@ class FlotillaCloudFormation(object):
         service_params['InstanceType'] = service.get('instance_type', 't2.nano')
         service_params['InstanceMin'] = service.get('instance_min', '1')
         service_params['InstanceMax'] = service.get('instance_max', '1')
+        service_params['HealthCheckTarget'] = service.get('health_check',
+                                                          'TCP:80')
+        service_params['ElbScheme'] = service.get('elb_scheme',
+                                                  'internet-facing')
 
         dns_name = service.get('dns_name')
         if dns_name:
@@ -170,6 +236,9 @@ class FlotillaCloudFormation(object):
         :return: Hash.
         """
         params = dict(vpc_outputs)
+        params['instance_type'] = service.get('instance_type', '')
+        params['elb_scheme'] = service.get('elb_scheme', '')
+
         # TODO: copy service params into hash
         return sha256(self._service_elb, params)
 

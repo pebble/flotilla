@@ -417,7 +417,7 @@
         "DesiredCapacity": {"Ref": "InstanceMin"},
         "MaxSize": {"Ref": "InstanceMax"},
         "MinSize": {"Ref": "InstanceMin"},
-        "HealthCheckGracePeriod": "300",
+        "HealthCheckGracePeriod": "600",
         "HealthCheckType": "ELB",
         "VPCZoneIdentifier": [
           {"Ref": "PrivateSubnet01"},
@@ -508,7 +508,13 @@
               "HostedZoneId": {
                 "Fn::GetAtt": ["Elb", "CanonicalHostedZoneNameID"]
               },
-              "DNSName": {"Fn::GetAtt": ["Elb", "CanonicalHostedZoneName"]}
+              "DNSName": {
+                "Fn::If": [
+                  "ElbPublic",
+                  {"Fn::GetAtt": ["Elb", "CanonicalHostedZoneName"]},
+                  {"Fn::GetAtt": ["Elb", "DNSName"]}
+                ]
+              }
             }
           }
         ]
