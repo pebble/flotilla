@@ -4,7 +4,7 @@
   "Parameters": {
     "NatInstanceType": {
       "Type": "String",
-      "Default": "t2.micro",
+      "Default": "t2.nano",
       "Description": "Instance type for NAT instances."
     },
     "NatAmi": {

@@ -14,7 +14,7 @@
     },
     "InstanceType": {
       "Type": "String",
-      "Default": "t2.micro",
+      "Default": "t2.nano",
       "Description": "Instance type for scheduler."
     },
     "Ami": {
@@ -369,6 +369,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
+                    "dynamodb:BatchWriteItem",
                     "dynamodb:DeleteItem",
                     "dynamodb:GetItem",
                     "dynamodb:PutItem",

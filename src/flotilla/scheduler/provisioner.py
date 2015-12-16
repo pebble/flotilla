@@ -114,7 +114,7 @@ class FlotillaProvisioner(object):
         nat_coreos_version = region.get('nat_coreos_version', 'current')
         nat_ami = self._coreos.get_ami(nat_coreos_channel, nat_coreos_version,
                                        region_name)
-        nat_instance_type = region.get('nat_instance_type', 't2.micro')
+        nat_instance_type = region.get('nat_instance_type', 't2.nano')
 
         az1 = region.get('az1', '%sa' % region_name)
         az2 = region.get('az2', '%sb' % region_name)
@@ -133,7 +133,7 @@ class FlotillaProvisioner(object):
         stack_params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
         stack_params['FlotillaEnvironment'] = self._environment
         stack_params['ServiceName'] = service_name
-        stack_params['InstanceType'] = service.get('instance_type', 't2.micro')
+        stack_params['InstanceType'] = service.get('instance_type', 't2.nano')
         # FIXME: HA by default, don't be cheap
         stack_params['InstanceMin'] = service.get('instance_min', '1')
         stack_params['InstanceMax'] = service.get('instance_max', '1')
