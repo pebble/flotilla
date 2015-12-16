@@ -1,7 +1,8 @@
 import logging
 import json
 import time
-from flotilla.model import FlotillaServiceRevision, FlotillaUnit
+from flotilla.model import FlotillaServiceRevision, FlotillaUnit, \
+    GLOBAL_ASSIGNMENT
 from boto.dynamodb2.exceptions import ItemNotFound
 
 logger = logging.getLogger('flotilla')
@@ -55,7 +56,8 @@ class FlotillaAgentDynamo(object):
                          len(units))
 
         try:
-            global_assignment = self._assignments.get_item(instance_id='global')
+            global_assignment = self._assignments.get_item(
+                instance_id=GLOBAL_ASSIGNMENT)
             global_revision = global_assignment['assignment']
             units += self._load_revision_units(global_revision)
         except ItemNotFound:

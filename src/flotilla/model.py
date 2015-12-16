@@ -3,7 +3,7 @@ import os
 import time
 
 UNIT_PREFIX = 'flotilla-'
-
+GLOBAL_ASSIGNMENT = 'global'
 
 class FlotillaUnit(object):
     """Systemd unit file and configuration (environment variables)."""

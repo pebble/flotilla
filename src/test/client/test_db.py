@@ -18,6 +18,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         ])
         self.rev_hash = self.revision.revision_hash
 
+        self.assignments = MagicMock(spec=Table)
         self.regions = MagicMock(spec=Table)
         self.revisions = MagicMock(spec=Table)
         self.services = MagicMock(spec=Table)
@@ -35,7 +36,8 @@ class TestFlotillaClientDynamo(unittest.TestCase):
             self.service_data.__contains__
         self.service_item.keys.side_effect = self.service_data.keys
         self.services.get_item.return_value = self.service_item
-        self.db = FlotillaClientDynamo(self.regions,
+        self.db = FlotillaClientDynamo(self.assignments,
+                                       self.regions,
                                        self.revisions,
                                        self.services,
                                        self.units)
@@ -144,3 +146,10 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.db.configure_service(SERVICE_NAME, {'key': 'value'})
 
         existing_service.save.assert_called_with()
+
+    def test_set_global(self):
+        self.db.set_global(self.revision)
+
+        self.units.batch_write.assert_called_with()
+        self.revisions.new_item.assert_called_with(ANY)
+        self.assignments.put_item.assert_called_with(ANY)

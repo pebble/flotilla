@@ -1,7 +1,8 @@
 import logging
 from boto.dynamodb2.exceptions import ItemNotFound
 from collections import defaultdict
-from flotilla.model import FlotillaServiceRevision, FlotillaUnit
+from flotilla.model import FlotillaServiceRevision, FlotillaUnit, \
+    GLOBAL_ASSIGNMENT
 
 logger = logging.getLogger('flotilla')
 
@@ -10,26 +11,41 @@ class FlotillaClientDynamo(object):
     """Database interaction for worker/agent component.
 
     Required table permissions:
-    services:
-        - GetItem
+    assignments:
         - PutItem
-        - UpdateItem
+    regions:
+        - BatchWriteItem
     revisions:
         - GetItem
         - PutItem
         - DeleteItem
+    services:
+        - GetItem
+        - PutItem
+        - UpdateItem
+
     units:
         - GetItem
         - BatchWriteItem
     """
 
-    def __init__(self, regions, revisions, services, units):
+    def __init__(self, assignments, regions, revisions, services, units):
+        self._assignments = assignments
         self._regions = regions
         self._revisions = revisions
         self._services = services
         self._units = units
 
     def add_revision(self, service, revision):
+        rev_hash = self._store_revision(revision)
+        try:
+            rev_item = self._services.get_item(service_name=service)
+        except ItemNotFound:
+            rev_item = self._services.new_item(service)
+        rev_item[rev_hash] = revision.weight
+        rev_item.partial_save()
+
+    def _store_revision(self, revision):
         # Store units:
         with self._units.batch_write() as batch:
             for unit in revision.units:
@@ -55,13 +71,7 @@ class FlotillaClientDynamo(object):
             rev_item['units'] = [unit.unit_hash for unit in revision.units]
             rev_item.save()
 
-        # Link revision to service + weight:
-        try:
-            rev_item = self._services.get_item(service_name=service)
-        except ItemNotFound:
-            rev_item = self._services.new_item(service)
-        rev_item[rev_hash] = revision.weight
-        rev_item.partial_save()
+        return rev_hash
 
     def del_revision(self, service, rev_hash):
         try:
@@ -160,3 +170,11 @@ class FlotillaClientDynamo(object):
         for key, value in updates.items():
             service_item[key] = value
         service_item.save()
+
+    def set_global(self, revision):
+        self._store_revision(revision)
+        rev_hash = self._store_revision(revision)
+        self._assignments.put_item({
+            'instance_id': GLOBAL_ASSIGNMENT,
+            'assignment': rev_hash
+        })
