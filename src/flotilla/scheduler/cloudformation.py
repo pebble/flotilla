@@ -29,7 +29,7 @@ SERVICE_KEYS_ITERABLE = ('private_ports',
 FORWARD_FIELDS = ['VpcId', 'NatSecurityGroup']
 for i in range(1, 4):
     FORWARD_FIELDS.append('PublicSubnet0%d' % i)
-FORWARD_FIELDS.append('PrivateSubnet0%d' % i)
+    FORWARD_FIELDS.append('PrivateSubnet0%d' % i)
 
 
 def sha256(val, params={}):
@@ -92,7 +92,6 @@ class FlotillaCloudFormation(object):
         name = 'flotilla-{0}-{1}'.format(self._environment,
                                          service['service_name'])
         service_params = self._service_params(region, service, vpc_outputs)
-
         json_template = json.loads(self._service_elb)
         resources = json_template['Resources']
 
