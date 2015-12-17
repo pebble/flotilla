@@ -8,21 +8,27 @@ logger = logging.getLogger('flotilla')
 SCHEMAS = {
     'assignments': [HashKey('instance_id')],
     'locks': [HashKey('lock_name')],
+    'regions': [HashKey('region_name')],
     'revisions': [HashKey('rev_hash')],
     'services': [HashKey('service_name')],
+    'stacks': [HashKey('stack_arn')],
     'status': [HashKey('service'), RangeKey('instance_id')],
     'units': [HashKey('unit_hash')]
 }
 
 
 class DynamoDbTables(object):
-    def __init__(self, dynamo, prefix='flotilla-'):
+    def __init__(self, dynamo, environment=None):
         self._dynamo = dynamo
-        self._prefix = prefix
+        if environment:
+            self._prefix = 'flotilla-{0}-'.format(environment)
+        else:
+            self._prefix = 'flotilla-'
         self.assignments = None
         self.locks = None
         self.revisions = None
         self.services = None
+        self.stacks = None
         self.status = None
         self.units = None
 

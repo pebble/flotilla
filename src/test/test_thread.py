@@ -8,7 +8,7 @@ class TestRepeatingFunc(unittest.TestCase):
     def test_run_on_time(self):
         instant_function = MagicMock()
         self.run_loop(instant_function)
-        assert instant_function.call_count > 17
+        assert instant_function.call_count > 16
         assert instant_function.call_count <= 20
 
     def test_run_eat_exception(self):

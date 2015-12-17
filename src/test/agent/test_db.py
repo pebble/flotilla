@@ -4,7 +4,7 @@ from boto.dynamodb2.exceptions import ItemNotFound
 from boto.dynamodb2.table import Table
 from flotilla.agent.db import FlotillaAgentDynamo
 
-ASSIGNED = '123456'
+ASSIGNED = 'e697b6b7cef7faba1bc7cbd20e0d247fdb46f96231cdef8897de0b6e19468c76'
 
 
 class TestFlotillaAgentDynamo(unittest.TestCase):
@@ -21,12 +21,17 @@ class TestFlotillaAgentDynamo(unittest.TestCase):
                                       self.status, self.assignments,
                                       self.revisions, self.units)
 
-        self.assignments.get_item.return_value = {'assignment': ASSIGNED}
-        self.revisions.get_item.return_value = {'units': ['1', '2', '3']}
+        self.assignments.get_item.side_effect = [{'assignment': ASSIGNED},
+                                                 ItemNotFound()]
+        self.revisions.get_item.return_value = {'units': ['1', '2', '3'],
+                                                'label': 'test'}
         self.units.batch_get.return_value = [
-            {'name': '1', 'unit_file': '', 'environment': ''},
-            {'name': '2', 'unit_file': '', 'environment': ''},
-            {'name': '3', 'unit_file': '', 'environment': ''}
+            {'name': '1', 'unit_file': '', 'environment': '',
+             'unit_hash': '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b'},
+            {'name': '2', 'unit_file': '', 'environment': '',
+             'unit_hash': 'd4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35'},
+            {'name': '3', 'unit_file': '', 'environment': '',
+             'unit_hash': '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce'}
         ]
 
     def test_store_status(self):
@@ -55,3 +60,25 @@ class TestFlotillaAgentDynamo(unittest.TestCase):
             {'unit_hash': '2'},
             {'unit_hash': '3'}
         ])
+
+    def test_get_units_global(self):
+        self.assignments.get_item.side_effect = [{'assignment': ASSIGNED},
+                                                 {'assignment': ASSIGNED}]
+
+        units = self.db.get_units()
+
+        self.assertEqual(6, len(units))
+
+    def test_load_revision_unit_mismatch(self):
+        self.units.batch_get.return_value = [
+            {'name': '1', 'unit_file': 'pwned', 'environment': '',
+             'unit_hash': '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b'},
+            {'name': '2', 'unit_file': '', 'environment': '',
+             'unit_hash': 'd4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35'},
+            {'name': '3', 'unit_file': '', 'environment': '',
+             'unit_hash': '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce'}
+        ]
+
+        units = self.db._load_revision_units(ASSIGNED)
+
+        self.assertEqual(3, len(units))

@@ -4,16 +4,18 @@ import os
 import boto.ec2.elb
 from systemd.manager import Manager
 from main import get_instance_id, setup_logging
-from flotilla.agent import FlotillaAgent, FlotillaAgentDynamo, SystemdUnits
+from flotilla.agent import FlotillaAgent, FlotillaAgentDynamo, LoadBalancer, \
+    SystemdUnits
 from flotilla.db import DynamoDbTables, DynamoDbLocks
 from flotilla.thread import RepeatingFunc
 
 
-def get_elb():
+def get_elb(local_id):
     elb_name = os.environ.get('FLOTILLA_LB')
     if elb_name:
         elb_region = os.environ.get('FLOTILLA_LB_REGION', 'us-west-2')
-        return boto.ec2.elb.connect_to_region(elb_region)
+        elb = boto.ec2.elb.connect_to_region(elb_region)
+        return LoadBalancer(local_id, elb_name, elb)
     else:
         return None
 
@@ -24,17 +26,19 @@ if __name__ == '__main__':
     # Identity:
     instance_id = get_instance_id()
     service = os.environ['FLOTILLA_SERVICE']
+    environment = os.environ.get('FLOTILLA_ENV')
 
     # Systemd:
     manager = Manager()
     systemd = SystemdUnits(manager)
 
     # AWS services:
-    elb = get_elb()
-    dynamo = boto.dynamodb2.connect_to_region('us-east-1')
+    lb = get_elb(instance_id)
+    db_region = os.environ.get('FLOTILLA_REGION', 'us-east-1')
+    dynamo = boto.dynamodb2.connect_to_region(db_region)
 
     # DynamoDB:
-    tables = DynamoDbTables(dynamo)
+    tables = DynamoDbTables(dynamo, environment=environment)
     tables.setup(['status', 'assignments', 'revisions', 'units', 'locks'])
     db = FlotillaAgentDynamo(instance_id, service, tables.status,
                              tables.assignments, tables.revisions,
@@ -42,7 +46,7 @@ if __name__ == '__main__':
     locks = DynamoDbLocks(instance_id, tables.locks)
 
     # Assemble into agent:
-    agent = FlotillaAgent(service, db, locks, systemd, elb)
+    agent = FlotillaAgent(service, db, locks, systemd, lb)
 
     # Start loops:
     funcs = [

@@ -51,7 +51,7 @@ class LoadBalancer(object):
         logger.debug('Registering to %s.', self._elb_name)
         self._elb.register_instances(self._elb_name, [self._id])
         state = self._wait_for_state('InService', timeout)
-        logger.debug('Registered from %s.', self._elb_name)
+        logger.debug('Registered to %s.', self._elb_name)
         return state
 
     def _wait_for_state(self, state, timeout):

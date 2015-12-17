@@ -1,7 +1,8 @@
 import logging
 import json
 import time
-from flotilla.model import FlotillaUnit
+from flotilla.model import FlotillaServiceRevision, FlotillaUnit, \
+    GLOBAL_ASSIGNMENT
 from boto.dynamodb2.exceptions import ItemNotFound
 
 logger = logging.getLogger('flotilla')
@@ -49,19 +50,43 @@ class FlotillaAgentDynamo(object):
         assigned_revision = self.get_assignment()
         if assigned_revision:
             logger.debug('Assigned: %s, fetching units.', assigned_revision)
-            revision_item = self._revisions.get_item(rev_hash=assigned_revision)
-            unit_items = self._units.batch_get(keys=[
-                {'unit_hash': unit} for unit in revision_item['units']
-                ])
-            for unit_item in unit_items:
-                units.append(FlotillaUnit(unit_item['name'],
-                                          unit_item['unit_file'],
-                                          unit_item['environment']))
+            units += self._load_revision_units(assigned_revision)
 
             logger.debug('Assignment %s contained %d units.', assigned_revision,
                          len(units))
 
-        # TODO: global services?
+        try:
+            global_assignment = self._assignments.get_item(
+                instance_id=GLOBAL_ASSIGNMENT)
+            global_revision = global_assignment['assignment']
+            units += self._load_revision_units(global_revision)
+        except ItemNotFound:
+            pass
+        return units
+
+    def _load_revision_units(self, assigned_revision):
+        revision_item = self._revisions.get_item(rev_hash=assigned_revision)
+        unit_items = self._units.batch_get(keys=[
+            {'unit_hash': unit} for unit in revision_item['units']
+            ])
+        units = []
+        for unit_item in unit_items:
+            unit = FlotillaUnit(unit_item['name'],
+                                unit_item['unit_file'],
+                                unit_item['environment'])
+            unit_hash = unit.unit_hash
+            if unit_hash != unit_item['unit_hash']:
+                logger.warn('Unit hash %s expected %s', unit_hash,
+                            unit_item['unit_hash'])
+            units.append(unit)
+
+        revision = FlotillaServiceRevision(label=revision_item['label'],
+                                           units=units)
+        revision_hash = revision.revision_hash
+        if revision_hash != assigned_revision:
+            # FIXME: enforce?
+            logger.warn('Revision hash %s expected %s', revision_hash,
+                        assigned_revision)
         return units
 
     def get_assignment(self):

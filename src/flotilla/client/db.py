@@ -1,7 +1,8 @@
 import logging
 from boto.dynamodb2.exceptions import ItemNotFound
 from collections import defaultdict
-from flotilla.model import FlotillaServiceRevision, FlotillaUnit
+from flotilla.model import FlotillaServiceRevision, FlotillaUnit, \
+    GLOBAL_ASSIGNMENT
 
 logger = logging.getLogger('flotilla')
 
@@ -10,25 +11,41 @@ class FlotillaClientDynamo(object):
     """Database interaction for worker/agent component.
 
     Required table permissions:
-    services:
-        - GetItem
+    assignments:
         - PutItem
-        - UpdateItem
+    regions:
+        - BatchWriteItem
     revisions:
         - GetItem
         - PutItem
         - DeleteItem
+    services:
+        - GetItem
+        - PutItem
+        - UpdateItem
+
     units:
         - GetItem
         - BatchWriteItem
     """
 
-    def __init__(self, units_table, revisions_table, services_table):
-        self._units = units_table
-        self._revisions = revisions_table
-        self._services = services_table
+    def __init__(self, assignments, regions, revisions, services, units):
+        self._assignments = assignments
+        self._regions = regions
+        self._revisions = revisions
+        self._services = services
+        self._units = units
 
     def add_revision(self, service, revision):
+        rev_hash = self._store_revision(revision)
+        try:
+            rev_item = self._services.get_item(service_name=service)
+        except ItemNotFound:
+            rev_item = self._services.new_item(service)
+        rev_item[rev_hash] = revision.weight
+        rev_item.partial_save()
+
+    def _store_revision(self, revision):
         # Store units:
         with self._units.batch_write() as batch:
             for unit in revision.units:
@@ -54,13 +71,7 @@ class FlotillaClientDynamo(object):
             rev_item['units'] = [unit.unit_hash for unit in revision.units]
             rev_item.save()
 
-        # Link revision to service + weight:
-        try:
-            rev_item = self._services.get_item(service_name=service)
-        except ItemNotFound:
-            rev_item = self._services.new_item(service)
-        rev_item[rev_hash] = revision.weight
-        rev_item.partial_save()
+        return rev_hash
 
     def del_revision(self, service, rev_hash):
         try:
@@ -123,6 +134,47 @@ class FlotillaClientDynamo(object):
 
             unit_revs = unit_rev[unit['unit_hash']]
             logger.debug('Adding to %d revisions.', len(unit_revs))
-            for unit_rev in unit_revs:
-                flotilla_revisions[unit_rev].units.append(flotilla_unit)
+            for rev in unit_revs:
+                flotilla_revisions[rev].units.append(flotilla_unit)
         return flotilla_revisions.values()
+
+    def configure_regions(self, regions, updates):
+        if isinstance(regions, str):
+            regions = [regions]
+
+        # Load current items:
+        region_items = {}
+        keys = [{'region_name': region} for region in regions]
+        for item in self._regions.batch_get(keys):
+            region = item['region_name']
+            region_items[region] = item
+
+        # Create/update items:
+        for region in regions:
+            region_item = region_items.get(region)
+            if not region_item:
+                region_item = self._regions.new_item(region)
+                region_items[region] = region_item
+            for key, value in updates.items():
+                region_item[key] = value
+
+        # Store updated items:
+        with self._regions.batch_write() as batch:
+            for region_item in region_items.values():
+                batch.put_item(region_item)
+
+    def configure_service(self, service, updates):
+        service_item = self._services.get_item(service_name=service)
+        if not service_item:
+            service_item = self._services.new_item(service_name=service)
+        for key, value in updates.items():
+            service_item[key] = value
+        service_item.save()
+
+    def set_global(self, revision):
+        self._store_revision(revision)
+        rev_hash = self._store_revision(revision)
+        self._assignments.put_item({
+            'instance_id': GLOBAL_ASSIGNMENT,
+            'assignment': rev_hash
+        })
