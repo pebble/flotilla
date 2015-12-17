@@ -19,8 +19,7 @@ SERVICE_KEYS_STRINGS = ('coreos_channel',
                         'health_check',
                         'instance_max',
                         'instance_min',
-                        'instance_type',
-                        'log_driver')
+                        'instance_type')
 
 SERVICE_KEYS_ITERABLE = ('private_ports',
                          'public_ports',
@@ -169,9 +168,6 @@ class FlotillaCloudFormation(object):
                                                           'TCP:80')
         service_params['ElbScheme'] = service.get('elb_scheme',
                                                   'internet-facing')
-
-        service_params['DockerLogDriver'] = service.get('log_driver',
-                                                        'json-file')
 
         dns_name = service.get('dns_name')
         if dns_name:

@@ -87,12 +87,6 @@
       "Type": "String",
       "Default": "us-east-1",
       "Description": "DynamoDB region"
-    },
-    "DockerLogDriver": {
-      "Type": "String",
-      "Default": "json-file",
-      "Description": "Docker logging driver https://docs.docker.com/engine/reference/logging/overview/",
-      "AllowedValues": ["json-file", "journald", "fluentd"]
     }
   },
   "Conditions": {
@@ -403,16 +397,6 @@
                 " -v /etc/flotilla:/etc/flotilla",
                 " pwagner/flotilla", "\n",
                 "        ExecStop=/usr/bin/docker stop flotilla", "\n",
-                "    - name: docker.service", "\n",
-                "      drop-ins:", "\n",
-                "        - name: 10-log-driver.conf", "\n",
-                "          content: |", "\n",
-                "            [Service]", "\n",
-                "            Environment=\"DOCKER_OPTS=--log-driver=",
-                {"Ref": "DockerLogDriver"},
-                "\"", "\n",
-                "            ", "\n",
-                "      command: start", "\n",
                 "\n",
                 "users:", "\n",
                 "  - name: core", "\n",
