@@ -451,6 +451,7 @@
                 "        ", "\n",
                 "        [Service]", "\n",
                 "        User=core", "\n",
+                "        Restart=always", "\n",
                 "        ExecStartPre=-/usr/bin/docker kill flotilla-scheduler",
                 "\n",
                 "        ExecStartPre=-/usr/bin/docker rm flotilla-scheduler",
