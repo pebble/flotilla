@@ -15,6 +15,7 @@ class FlotillaAgent(object):
     def assignment(self):
         """Check for active assignment and update if necessary."""
         assignment = self._db.get_assignment()
+        # TODO: what about if global assignment changes?
         if self._assignment != assignment:
             logger.debug('Updated assignment: %s (was %s)', assignment,
                          self._assignment)

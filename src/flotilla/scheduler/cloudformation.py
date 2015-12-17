@@ -148,12 +148,17 @@ class FlotillaCloudFormation(object):
         service_params['ServiceName'] = service_name
         # FIXME: HA by default, don't be cheap
         service_params['InstanceType'] = service.get('instance_type', 't2.nano')
-        service_params['InstanceMin'] = service.get('instance_min', '1')
-        service_params['InstanceMax'] = service.get('instance_max', '1')
+        instance_min = service.get('instance_min', '1')
+        service_params['InstanceMin'] = instance_min
+        service_params['InstanceMax'] = service.get('instance_max',
+                                                    instance_min)
         service_params['HealthCheckTarget'] = service.get('health_check',
                                                           'TCP:80')
         service_params['ElbScheme'] = service.get('elb_scheme',
                                                   'internet-facing')
+
+        service_params['DockerLogDriver'] = service.get('log_driver',
+                                                        'json-file')
 
         dns_name = service.get('dns_name')
         if dns_name:

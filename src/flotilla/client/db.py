@@ -164,9 +164,10 @@ class FlotillaClientDynamo(object):
                 batch.put_item(region_item)
 
     def configure_service(self, service, updates):
-        service_item = self._services.get_item(service_name=service)
-        if not service_item:
-            service_item = self._services.new_item(service_name=service)
+        try:
+            service_item = self._services.get_item(service_name=service)
+        except ItemNotFound:
+            service_item = self._services.new_item(service)
         for key, value in updates.items():
             service_item[key] = value
         service_item.save()
@@ -177,4 +178,4 @@ class FlotillaClientDynamo(object):
         self._assignments.put_item({
             'instance_id': GLOBAL_ASSIGNMENT,
             'assignment': rev_hash
-        })
+        }, overwrite=True)

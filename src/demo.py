@@ -46,30 +46,76 @@ def sync_cloudformation(cloudformation):
 if __name__ == '__main__':
     dynamo = boto.dynamodb2.connect_to_region('us-east-1')
     tables = DynamoDbTables(dynamo, environment='develop')
-    tables.setup(['regions', 'revisions', 'services', 'units'])
-    db = FlotillaClientDynamo(tables.regions, tables.revisions, tables.services,
-                              tables.units)
+    tables.setup(['assignments', 'regions', 'revisions', 'services', 'units'])
+    db = FlotillaClientDynamo(tables.assignments, tables.regions,
+                              tables.revisions, tables.services, tables.units)
 
-    # Define ElasticSearch ports:
+    # Autoprovisioned ElasticSearch service:
+    elasticsearch_dns = 'elasticsearch-develop.mycloudand.me'
     db.configure_service('elasticsearch', {
         'regions': ['us-east-1'],
         'public_ports': {9200: 'HTTP'},
         'private_ports': {9300: ['TCP']},
         'health_check': 'HTTP:9200/',
         'instance_type': 't2.small',
-        'elb_scheme': 'internal'
+        'elb_scheme': 'internal',
+        'dns_name': elasticsearch_dns,
+        'log_driver': 'fluentd'
     })
-
-    # Register initial revision of service:
     elasticsearch = FlotillaDockerService('elasticsearch.service',
                                           'pwagner/elasticsearch-aws:latest',
                                           ports={9200: 9200, 9300: 9300})
-    db.add_revision('elasticsearch',
-                    FlotillaServiceRevision(label='initial',
-                                            units=[elasticsearch]))
+    db.add_revision('elasticsearch', FlotillaServiceRevision(label='initial',
+                                                             units=[
+                                                                 elasticsearch
+                                                             ]))
 
+    # Autoprovisioned Kibana frontend:
+    db.configure_service('kibana', {
+        'regions': ['us-east-1'],
+        'public_ports': {80: 'HTTP'},
+        'health_check': 'HTTP:80/',
+        'instance_type': 't2.micro',
+        'log_driver': 'fluentd'
+    })
+    es_url = 'http://%s:9200' % elasticsearch_dns
+    kibana = FlotillaDockerService('kibana.service',
+                                   'kibana:latest',
+                                   ports={80: 5601},
+                                   environment={
+                                       'ELASTICSEARCH_URL': es_url
+                                   })
+    db.add_revision('kibana', FlotillaServiceRevision(label='initial',
+                                                      units=[
+                                                          kibana
+                                                      ]))
 
+    # Global units forward journald via fluentd:
+    fluentd = FlotillaDockerService('fluentd-forwarder.service',
+                                    'pwagner/fluentd-elasticsearch:latest',
+                                    ports={24224: 24224, 24225: 24225,
+                                           24226: 24226},
+                                    environment={
+                                        'ELASTICSEARCH_HOST': elasticsearch_dns
+                                    })
 
+    # https://github.com/ianblenke/docker-fluentd/blob/master/systemd/journald-fluentd.service
+    journald = FlotillaUnit('journald-fluent.service', '''[Unit]
+Description=Send journald logs to fluentd
+After=systemd-journald.service
+After=fluentd-forwarder.service
+
+[Service]
+Restart=always
+RestartSec=30s
+
+ExecStart=/bin/bash -c 'journalctl -o json --since=now -f | ncat 127.0.0.1 24225'
+''')
+
+    db.set_global(FlotillaServiceRevision(label='initial', units=[
+        fluentd,
+        journald
+    ]))
 
     # db.configure_regions(['us-west-2', 'us-east-1'], nat_coreos_channel='stable')
 

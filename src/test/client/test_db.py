@@ -133,11 +133,11 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.regions.batch_write.assert_called_with()
 
     def test_configure_service_create(self):
-        self.services.get_item.return_value = None
+        self.services.get_item.side_effect = ItemNotFound()
 
         self.db.configure_service(SERVICE_NAME, {'key': 'value'})
 
-        self.services.new_item.assert_called_with(service_name=SERVICE_NAME)
+        self.services.new_item.assert_called_with(SERVICE_NAME)
 
     def test_configure_service_exists(self):
         existing_service = MagicMock(spec=Item)
@@ -152,4 +152,4 @@ class TestFlotillaClientDynamo(unittest.TestCase):
 
         self.units.batch_write.assert_called_with()
         self.revisions.new_item.assert_called_with(ANY)
-        self.assignments.put_item.assert_called_with(ANY)
+        self.assignments.put_item.assert_called_with(ANY, overwrite=True)
