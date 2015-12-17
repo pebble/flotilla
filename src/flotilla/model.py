@@ -35,14 +35,17 @@ class FlotillaUnit(object):
 class FlotillaDockerService(FlotillaUnit):
     """Specialized unit file for running a docker service."""
 
-    def __init__(self, name, image, ports={}, environment={}):
+    def __init__(self, name, image, ports={}, environment={}, logdriver=None):
         ports_flag = ''
         if ports:
             ports_flag = ' -p ' + ' -p '.join(['%s:%s' % (k, v)
                                                for k, v in ports.items()])
         environment_flag = ''
         if environment:
-            environment_flag = " --env-file /etc/flotilla/%n"
+            environment_flag = ' --env-file /etc/flotilla/%n'
+
+        if logdriver:
+            environment_flag += ' --log-driver=%s' % logdriver
         unit_file = """[Unit]
 Description={0}
 
