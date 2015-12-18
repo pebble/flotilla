@@ -1,5 +1,6 @@
 import unittest
 from mock import MagicMock, ANY
+from boto.kms.layer1 import KMSConnection
 from boto.dynamodb2.exceptions import ItemNotFound
 from boto.dynamodb2.table import Table
 from flotilla.agent.db import FlotillaAgentDynamo
@@ -13,13 +14,14 @@ class TestFlotillaAgentDynamo(unittest.TestCase):
         self.assignments = MagicMock(spec=Table)
         self.revisions = MagicMock(spec=Table)
         self.units = MagicMock(spec=Table)
+        self.kms = MagicMock(spec=KMSConnection)
 
         self.instance_id = 'i-123456'
         self.service = 'mock-service'
 
         self.db = FlotillaAgentDynamo(self.instance_id, self.service,
                                       self.status, self.assignments,
-                                      self.revisions, self.units)
+                                      self.revisions, self.units, self.kms)
 
         self.assignments.get_item.side_effect = [{'assignment': ASSIGNED},
                                                  ItemNotFound()]
@@ -82,3 +84,25 @@ class TestFlotillaAgentDynamo(unittest.TestCase):
         units = self.db._load_revision_units(ASSIGNED)
 
         self.assertEqual(3, len(units))
+
+    def test_load_revision_units_decrypt(self):
+        self.units.batch_get.return_value = [{
+            'name': '1',
+            'unit_file': '',
+            'unit_hash': '2e96c29527f87d9d6a1dbab735590a23132abea196a785f607ec52d1c1a4c730',
+            'environment_key': 'kms-ciphertext'.encode('base64'),
+            'environment_iv': 'MDAwMDAwMDAwMDAwMDAwMA==',
+            'environment_data': 'guZyiyEsGQ6e8HIOMRQsdeXMl+6k2ywTfZi+MojMrAg='
+        }]
+
+        self.kms.decrypt.return_value = {
+            'Plaintext': '0000000000000000'
+        }
+
+        units = self.db._load_revision_units(ASSIGNED)
+
+        self.kms.decrypt.assert_called_with('kms-ciphertext')
+        decrypted_env = units[0].environment
+        self.assertEqual(len(decrypted_env), 2)
+        self.assertEqual(decrypted_env['foo'], 'bar')
+        self.assertEqual(decrypted_env['typesafe'], True)

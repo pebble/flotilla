@@ -4,6 +4,7 @@ import time
 from flotilla.model import FlotillaServiceRevision, FlotillaUnit, \
     GLOBAL_ASSIGNMENT
 from boto.dynamodb2.exceptions import ItemNotFound
+from Crypto.Cipher import AES
 
 logger = logging.getLogger('flotilla')
 
@@ -23,13 +24,14 @@ class FlotillaAgentDynamo(object):
     """
 
     def __init__(self, instance_id, service_name, status_table,
-                 assignments_table, revisions_table, units_table):
+                 assignments_table, revisions_table, units_table, kms):
         self._id = instance_id
         self._service = service_name
         self._status = status_table
         self._assignments = assignments_table
         self._revisions = revisions_table
         self._units = units_table
+        self._kms = kms
 
     def store_status(self, unit_status):
         """Store unit status.
@@ -57,7 +59,7 @@ class FlotillaAgentDynamo(object):
 
         try:
             global_assignment = self._assignments.get_item(
-                instance_id=GLOBAL_ASSIGNMENT)
+                    instance_id=GLOBAL_ASSIGNMENT)
             global_revision = global_assignment['assignment']
             units += self._load_revision_units(global_revision)
         except ItemNotFound:
@@ -71,9 +73,18 @@ class FlotillaAgentDynamo(object):
             ])
         units = []
         for unit_item in unit_items:
-            unit = FlotillaUnit(unit_item['name'],
-                                unit_item['unit_file'],
-                                unit_item['environment'])
+            env_key = unit_item.get('environment_key')
+            if env_key:
+                decrypted_key = self._kms.decrypt(env_key.decode('base64'))
+                iv = unit_item['environment_iv'].decode('base64')
+                aes = AES.new(decrypted_key['Plaintext'], AES.MODE_CBC, iv)
+                ciphertext = unit_item['environment_data'].decode('base64')
+                plaintext = aes.decrypt(ciphertext)
+                unit_environment = json.loads(plaintext)
+            else:
+                unit_environment = unit_item['environment']
+            unit_file = unit_item['unit_file']
+            unit = FlotillaUnit(unit_item['name'], unit_file, unit_environment)
             unit_hash = unit.unit_hash
             if unit_hash != unit_item['unit_hash']:
                 logger.warn('Unit hash %s expected %s', unit_hash,

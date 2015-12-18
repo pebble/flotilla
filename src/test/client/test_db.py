@@ -166,10 +166,11 @@ class TestFlotillaClientDynamo(unittest.TestCase):
             'CiphertextBlob': 'topsecret'
         }
 
-        key_id = '5901dc99-0a0e-480a-a67f-559347ff2c64'
-        ciphertext, key = self.db._encrypt_environment(key_id, {})
-        self.assertEqual(key, 'topsecret')
-        self.assertEqual(len(ciphertext), 32)
+        unit = {}
+        self.db._encrypt_environment('key-12345', {}, unit)
+        self.assertEqual(unit['environment_key'], 'topsecret'.encode('base64'))
+        self.assertTrue('environment_iv' in unit)
+        self.assertTrue('environment_data' in unit)
 
     def test_store_revision_encryption(self):
         self.units.has_item.return_value = False
@@ -177,4 +178,4 @@ class TestFlotillaClientDynamo(unittest.TestCase):
 
         self.db._store_revision(self.revision, 'key')
 
-        self.db._encrypt_environment.assert_called_with('key', ANY)
+        self.db._encrypt_environment.assert_called_with('key', ANY, ANY)
