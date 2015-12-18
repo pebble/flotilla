@@ -12,6 +12,19 @@ DONE_STATES = ('CREATE_COMPLETE',
                'UPDATE_COMPLETE',
                'UPDATE_ROLLBACK_COMPLETE')
 
+SERVICE_KEYS_STRINGS = ('coreos_channel',
+                        'coreos_version',
+                        'dns_name',
+                        'elb_scheme',
+                        'health_check',
+                        'instance_max',
+                        'instance_min',
+                        'instance_type')
+
+SERVICE_KEYS_ITERABLE = ('private_ports',
+                         'public_ports',
+                         'regions')
+
 FORWARD_FIELDS = ['VpcId', 'NatSecurityGroup']
 for i in range(1, 4):
     FORWARD_FIELDS.append('PublicSubnet0%d' % i)
@@ -23,7 +36,7 @@ def sha256(val, params={}):
     hasher.update(val)
     for k in sorted(params.keys()):
         hasher.update(k)
-        hasher.update(params[k])
+        hasher.update(str(params[k]))
     return hasher.hexdigest()
 
 
@@ -78,7 +91,6 @@ class FlotillaCloudFormation(object):
         name = 'flotilla-{0}-{1}'.format(self._environment,
                                          service['service_name'])
         service_params = self._service_params(region, service, vpc_outputs)
-
         json_template = json.loads(self._service_elb)
         resources = json_template['Resources']
 
@@ -148,8 +160,10 @@ class FlotillaCloudFormation(object):
         service_params['ServiceName'] = service_name
         # FIXME: HA by default, don't be cheap
         service_params['InstanceType'] = service.get('instance_type', 't2.nano')
-        service_params['InstanceMin'] = service.get('instance_min', '1')
-        service_params['InstanceMax'] = service.get('instance_max', '1')
+        instance_min = service.get('instance_min', '1')
+        service_params['InstanceMin'] = instance_min
+        service_params['InstanceMax'] = service.get('instance_max',
+                                                    instance_min)
         service_params['HealthCheckTarget'] = service.get('health_check',
                                                           'TCP:80')
         service_params['ElbScheme'] = service.get('elb_scheme',
@@ -236,10 +250,16 @@ class FlotillaCloudFormation(object):
         :return: Hash.
         """
         params = dict(vpc_outputs)
-        params['instance_type'] = service.get('instance_type', '')
-        params['elb_scheme'] = service.get('elb_scheme', '')
 
-        # TODO: copy service params into hash
+        for key in SERVICE_KEYS_ITERABLE:
+            value = service.get(key)
+            if value:
+                params[key] = sorted(value)
+
+        for key in SERVICE_KEYS_STRINGS:
+            value = service.get(key)
+            if value:
+                params[key] = value
         return sha256(self._service_elb, params)
 
     def _client(self, region):

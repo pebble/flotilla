@@ -40,6 +40,27 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         service_hash = self.cf.service_hash(self.service, {'foo': 'bar'})
         self.assertIsNotNone(service_hash)
 
+    def test_service_hash_string_fields(self):
+        hash_base = self.cf.service_hash(self.service, {'foo': 'bar'})
+
+        self.service['instance_type'] = 't2.micro'
+        hash_with_string = self.cf.service_hash(self.service, {'foo': 'bar'})
+
+        self.assertNotEqual(hash_base, hash_with_string)
+
+    def test_service_hash_iterable_fields(self):
+        hash_base = self.cf.service_hash(self.service, {'foo': 'bar'})
+
+        self.service['regions'] = ['us-east-1', 'us-west-2']
+        hash_with_list = self.cf.service_hash(self.service, {'foo': 'bar'})
+        self.assertNotEqual(hash_base, hash_with_list)
+
+        self.service['regions'] = ['us-west-2', 'us-east-1']
+        hash_with_list_order = self.cf.service_hash(self.service,
+                                                    {'foo': 'bar'})
+        self.assertNotEqual(hash_base, hash_with_list_order)
+        self.assertEqual(hash_with_list, hash_with_list_order)
+
     def test_vpc_hash(self):
         vpc_hash = self.cf.vpc_hash({'foo': 'bar'})
         self.assertIsNotNone(vpc_hash)

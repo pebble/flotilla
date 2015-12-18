@@ -63,6 +63,13 @@ class TestFlotillaDockerService(unittest.TestCase):
         docker_env = ' --env-file '
         self.assertTrue(docker_env in self.unit.unit_file)
 
+    def test_constructor_logdriver(self):
+        self.unit = FlotillaDockerService(DOCKER_NAME, DOCKER_IMAGE,
+                                          logdriver='journald')
+
+        logging_flag = ' --log-driver=journald '
+        self.assertTrue(logging_flag in self.unit.unit_file)
+
 
 REV_LABEL = 'initial'
 REV_HASH = 'd6a3935f96ba53a42a1ab30ab3d492d726ef9cfc8ae5cf038cf83c14d00a3637'
