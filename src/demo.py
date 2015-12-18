@@ -3,6 +3,7 @@
 import logging
 import boto.cloudformation
 import boto.dynamodb2
+import boto.kms
 from boto.exception import BotoServerError
 from flotilla.model import *
 from flotilla.db import DynamoDbTables
@@ -44,11 +45,17 @@ def sync_cloudformation(cloudformation):
 
 
 if __name__ == '__main__':
-    dynamo = boto.dynamodb2.connect_to_region('us-east-1')
+    home_region = 'us-east-1'
+    cloudformation = boto.cloudformation.connect_to_region(home_region)
+    cf_stack = sync_cloudformation(cloudformation)
+
+    dynamo = boto.dynamodb2.connect_to_region(home_region)
+    kms = boto.kms.connect_to_region(home_region)
     tables = DynamoDbTables(dynamo, environment='develop')
     tables.setup(['assignments', 'regions', 'revisions', 'services', 'units'])
     db = FlotillaClientDynamo(tables.assignments, tables.regions,
-                              tables.revisions, tables.services, tables.units)
+                              tables.revisions, tables.services, tables.units,
+                              kms)
 
     # Configure host regions
     db.configure_regions(['us-east-1'], {
@@ -56,7 +63,6 @@ if __name__ == '__main__':
         'az2': 'us-east-1c',
         'az3': 'us-east-1d'
     })
-    #
 
     # Autoprovisioned ElasticSearch service:
     elasticsearch_dns = 'elasticsearch-develop.mycloudand.me'
@@ -126,6 +132,3 @@ ExecStart=/bin/bash -c 'journalctl -o json --since=now -f | ncat 127.0.0.1 24225
         fluentd,
         journald
     ]))
-
-    cloudformation = boto.cloudformation.connect_to_region('us-east-1')
-    cf_stack = sync_cloudformation(cloudformation)

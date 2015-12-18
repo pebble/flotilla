@@ -3,8 +3,15 @@ from boto.dynamodb2.exceptions import ItemNotFound
 from collections import defaultdict
 from flotilla.model import FlotillaServiceRevision, FlotillaUnit, \
     GLOBAL_ASSIGNMENT
+import json
+from Crypto.Cipher import AES
+from Crypto import Random
 
 logger = logging.getLogger('flotilla')
+
+
+def aes_pad(s):
+    return s + (AES.block_size - len(s) % AES.block_size) * ' '
 
 
 class FlotillaClientDynamo(object):
@@ -29,23 +36,27 @@ class FlotillaClientDynamo(object):
         - BatchWriteItem
     """
 
-    def __init__(self, assignments, regions, revisions, services, units):
+    def __init__(self, assignments, regions, revisions, services, units, kms):
         self._assignments = assignments
         self._regions = regions
         self._revisions = revisions
         self._services = services
         self._units = units
+        self._kms = kms
 
     def add_revision(self, service, revision):
-        rev_hash = self._store_revision(revision)
         try:
-            rev_item = self._services.get_item(service_name=service)
+            service_item = self._services.get_item(service_name=service)
         except ItemNotFound:
-            rev_item = self._services.new_item(service)
-        rev_item[rev_hash] = revision.weight
-        rev_item.partial_save()
+            service_item = self._services.new_item(service)
 
-    def _store_revision(self, revision):
+        key = service_item.get('kms_key')
+        rev_hash = self._store_revision(revision, key)
+
+        service_item[rev_hash] = revision.weight
+        service_item.partial_save()
+
+    def _store_revision(self, revision, key):
         # Store units:
         with self._units.batch_write() as batch:
             for unit in revision.units:
@@ -58,9 +69,15 @@ class FlotillaClientDynamo(object):
                 unit_item = self._units.new_item(unit_hash)
                 unit_item['name'] = unit.name
                 unit_item['unit_file'] = unit.unit_file
-                if unit.environment:
-                    # TODO: KMS encrypt
-                    unit_item['environment'] = unit.environment
+                env = unit.environment
+                if env:
+                    if key:
+                        encrypted, key = self._encrypt_environment(key, env)
+                        unit_item['environment_crypt'] = encrypted.encode(
+                            'base64')
+                        unit_item['environment_key'] = key.encode('base64')
+                    else:
+                        unit_item['environment'] = env
                 batch.put_item(data=unit_item)
 
         # Link units to revision + label:
@@ -72,6 +89,17 @@ class FlotillaClientDynamo(object):
             rev_item.save()
 
         return rev_hash
+
+    def _encrypt_environment(self, key_id, environment):
+        kms_key = self._kms.generate_data_key(key_id, key_spec='AES_256')
+        plaintext_key = kms_key['Plaintext']
+        encrypted_key = kms_key['CiphertextBlob']
+
+        iv = Random.new().read(AES.block_size)
+        cipher = AES.new(plaintext_key, AES.MODE_CBC, iv)
+        environment_json = json.dumps(environment)
+        msg = iv + cipher.encrypt(aes_pad(environment_json))
+        return msg, encrypted_key
 
     def del_revision(self, service, rev_hash):
         try:
@@ -110,12 +138,12 @@ class FlotillaClientDynamo(object):
         flotilla_revisions = {}
         for rev_hash in rev_hashes:
             flotilla_revisions[rev_hash] = FlotillaServiceRevision(
-                weight=service_item[rev_hash])
+                    weight=service_item[rev_hash])
 
         # Load revisions, collect units and index:
         unit_rev = defaultdict(list)
         revisions = self._revisions.batch_get(
-            keys=[{'rev_hash': rev_hash} for rev_hash in rev_hashes])
+                keys=[{'rev_hash': rev_hash} for rev_hash in rev_hashes])
         for revision in revisions:
             rev_hash = revision['rev_hash']
             for unit in revision['units']:
@@ -126,7 +154,7 @@ class FlotillaClientDynamo(object):
 
         # Load units, add to return values
         service_units = self._units.batch_get(
-            keys=[{'unit_hash': unit_hash} for unit_hash in unit_rev.keys()]
+                keys=[{'unit_hash': unit_hash} for unit_hash in unit_rev.keys()]
         )
         for unit in service_units:
             flotilla_unit = FlotillaUnit(unit['name'], unit['unit_file'],
@@ -173,8 +201,7 @@ class FlotillaClientDynamo(object):
         service_item.save()
 
     def set_global(self, revision):
-        self._store_revision(revision)
-        rev_hash = self._store_revision(revision)
+        rev_hash = self._store_revision(revision, None)
         self._assignments.put_item({
             'instance_id': GLOBAL_ASSIGNMENT,
             'assignment': rev_hash

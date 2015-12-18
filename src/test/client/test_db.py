@@ -5,6 +5,7 @@ from flotilla.model import FlotillaServiceRevision, FlotillaDockerService
 from boto.dynamodb2.exceptions import ItemNotFound
 from boto.dynamodb2.table import Table
 from boto.dynamodb2.items import Item
+from boto.kms.layer1 import KMSConnection
 
 SERVICE_NAME = 'foo'
 
@@ -28,19 +29,24 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.revisions.get_item.return_value = self.revision_item
 
         self.service_item = MagicMock(spec=Item)
-        self.service_data = {}
-        self.service_data[self.rev_hash] = 1
+        self.service_data = {
+            self.rev_hash: 1
+        }
         self.service_item.__getitem__.side_effect = \
             self.service_data.__getitem__
         self.service_item.__contains__.side_effect = \
             self.service_data.__contains__
+        self.service_item.get.side_effect = \
+            self.service_data.get
         self.service_item.keys.side_effect = self.service_data.keys
         self.services.get_item.return_value = self.service_item
+        self.kms = MagicMock(spec=KMSConnection)
         self.db = FlotillaClientDynamo(self.assignments,
                                        self.regions,
                                        self.revisions,
                                        self.services,
-                                       self.units)
+                                       self.units,
+                                       self.kms)
 
     def test_add_revision(self):
         self.db.add_revision(SERVICE_NAME, self.revision)
@@ -153,3 +159,22 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.units.batch_write.assert_called_with()
         self.revisions.new_item.assert_called_with(ANY)
         self.assignments.put_item.assert_called_with(ANY, overwrite=True)
+
+    def test_encrypt_environment(self):
+        self.kms.generate_data_key.return_value = {
+            'Plaintext': '0000000000000000',
+            'CiphertextBlob': 'topsecret'
+        }
+
+        key_id = '5901dc99-0a0e-480a-a67f-559347ff2c64'
+        ciphertext, key = self.db._encrypt_environment(key_id, {})
+        self.assertEqual(key, 'topsecret')
+        self.assertEqual(len(ciphertext), 32)
+
+    def test_store_revision_encryption(self):
+        self.units.has_item.return_value = False
+        self.db._encrypt_environment = MagicMock(return_value=('blob', 'key'))
+
+        self.db._store_revision(self.revision, 'key')
+
+        self.db._encrypt_environment.assert_called_with('key', ANY)
