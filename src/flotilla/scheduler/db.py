@@ -1,5 +1,7 @@
 import logging
 import time
+import boto.vpc
+from boto.exception import EC2ResponseError
 from boto.dynamodb2.items import Item
 from collections import defaultdict
 
@@ -111,9 +113,48 @@ class FlotillaSchedulerDynamo(object):
 
         return assignments
 
+    def get_availability_zones_for_region(self, region):
+        vpc = boto.vpc.connect_to_region(region)
+        az = region + '-zzz'
+        azs = []
+        response = {
+            'region_name': region
+        }
+
+        try:
+            vpcs = vpc.get_all_vpcs()
+            vpc.create_subnet(vpcs[0].id,
+                              '172.31.192.0/20',
+                              availability_zone=az)
+        except EC2ResponseError as e:
+            if e:
+                split_message = "Subnets can currently only be created in the " \
+                                "following availability zones: "
+                azs = str(e).split(split_message, 1)[1]
+                azs = azs.split(".</Message>", 1)[0]
+                azs = azs.split(", ")
+        except:
+            """Region does not exist"""
+
+        for n, zone in enumerate(azs):
+            response['az' + str(n + 1)] = zone
+
+        return response
+
     def get_region_params(self, regions):
         keys = [{'region_name': region} for region in regions]
-        region_params = {region: {} for region in regions}
+        region_params = {}
         for item in self._regions.batch_get(keys):
             region_params[item['region_name']] = dict(item)
+
+        new_regions = []
+        for region in regions:
+            if region not in region_params:
+                new_region = self.get_availability_zones_for_region(region)
+                region_params[region] = new_region
+                new_regions.append(region)
+        if new_regions:
+            with self._regions.batch_write() as region_batch:
+                region_batch.put_item(new_region)
+
         return region_params

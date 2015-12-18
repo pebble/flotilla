@@ -120,10 +120,22 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.db.set_stacks([{'stack_arn': 'foo'}])
         self.stacks.batch_write.assert_called_with()
 
+    def test_get_availability_zones_for_region(self):
+        region_name = 'us-west-1'
+        azs = self.db.get_availability_zones_for_region(region_name)
+        assert azs['az1'] is not ''
+        assert azs['az2'] is not ''
+        self.assertEqual(azs['region_name'], region_name)
+
+    def test_get_availability_zones_for_region_empty(self):
+        region_name = 'i-will-never-exist'
+        azs = self.db.get_availability_zones_for_region(region_name)
+        self.assertEqual(azs, {'region_name': region_name})
+
     def test_get_region_params_empty(self):
         region_params = self.db.get_region_params(['us-east-1'])
         self.assertEqual(len(region_params), 1)
-        self.assertEqual(region_params['us-east-1'], {})
+        self.assertEqual(len(region_params['us-east-1']), 5)
 
     def test_get_region_params(self):
         self.regions.batch_get.return_value = [
@@ -134,4 +146,4 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assertEqual(len(region_params), 2)
         self.assertEqual(region_params['us-east-1'],
                          {'region_name': 'us-east-1', 'az1': 'us-east-1e'})
-        self.assertEqual(region_params['us-west-2'], {})
+        self.assertEqual(len(region_params['us-west-2']), 4)
