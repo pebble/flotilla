@@ -47,4 +47,4 @@ Flotilla workers periodically check for assignments in DynamoDb. If a worker's a
 
 ## Limitations
 
-Don't use this in production. This implementation is output from an 8h "hackathon". 
+Don't use this in production. This implementation is output from 3x8h "hackathon"s.
