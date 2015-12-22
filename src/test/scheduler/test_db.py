@@ -1,8 +1,11 @@
 import unittest
-from mock import MagicMock, ANY
+from mock import MagicMock, ANY, patch
 import time
 from flotilla.scheduler.db import FlotillaSchedulerDynamo, INSTANCE_EXPIRY
+from boto.exception import BotoServerError
 from boto.dynamodb2.table import Table, BatchTable
+from boto.vpc import VPCConnection
+from boto.vpc.vpc import VPC
 
 SERVICE = 'test'
 INSTANCE_ID = 'i-123456'
@@ -120,12 +123,62 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.db.set_stacks([{'stack_arn': 'foo'}])
         self.stacks.batch_write.assert_called_with()
 
+    @patch('boto.vpc.connect_to_region')
+    def test_create_region_item(self, mock_connect):
+        message = 'Value (us-east-1-zzz) for parameter availabilityZone is ' \
+                  'invalid. Subnets can currently only be created in the ' \
+                  'following availability zones: us-east-1c, us-east-1a, ' \
+                  'us-east-1d, us-east-1e.'
+        self.mock_subnet_error(mock_connect, message)
+
+        region_name = 'us-east-1'
+        region_item = self.db.create_region_item(region_name)
+        self.assertEqual(region_item['az1'], 'us-east-1c')
+        self.assertEqual(region_item['az2'], 'us-east-1a')
+        self.assertEqual(region_item['az3'], 'us-east-1d')
+        self.assertEqual(region_item['region_name'], region_name)
+
+    @patch('boto.vpc.connect_to_region')
+    def test_create_region_item_wrap(self, mock_connect):
+        message = 'Value (us-east-1-zzz) for parameter availabilityZone is ' \
+                  'invalid. Subnets can currently only be created in the ' \
+                  'following availability zones: us-east-1c, us-east-1a. '
+        self.mock_subnet_error(mock_connect, message)
+
+        region_item = self.db.create_region_item('us-east-1')
+        self.assertEqual(region_item['az1'], 'us-east-1c')
+        self.assertEqual(region_item['az2'], 'us-east-1a')
+        self.assertEqual(region_item['az3'], 'us-east-1c')
+
+    @patch('boto.vpc.connect_to_region')
+    def test_create_region_item_exception(self, mock_connect):
+        vpc = MagicMock(spec=VPCConnection)
+        mock_connect.return_value = vpc
+        vpc.get_all_vpcs.side_effect = BotoServerError(400, 'Kaboom')
+
+        self.assertRaises(BotoServerError, self.db.create_region_item,
+                          'us-east-1')
+
+    def mock_subnet_error(self, mock_connect, message):
+        vpc = MagicMock(spec=VPCConnection)
+        mock_connect.return_value = vpc
+        mock_vpc = MagicMock(spec=VPC)
+        mock_vpc.id = 'vpc-123456'
+        vpc.get_all_vpcs.return_value = [mock_vpc]
+        message = '<Message>%s</Message>' % message
+        vpc.create_subnet.side_effect = BotoServerError(400, 'Bad Request',
+                                                        message)
+
     def test_get_region_params_empty(self):
+        self.db.create_region_item = MagicMock(return_value={})
+
         region_params = self.db.get_region_params(['us-east-1'])
         self.assertEqual(len(region_params), 1)
-        self.assertEqual(region_params['us-east-1'], {})
+        self.db.create_region_item.assert_called_with('us-east-1')
 
     def test_get_region_params(self):
+        self.db.create_region_item = MagicMock(return_value={})
+
         self.regions.batch_get.return_value = [
             {'region_name': 'us-east-1', 'az1': 'us-east-1e'}
         ]
@@ -134,4 +187,4 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assertEqual(len(region_params), 2)
         self.assertEqual(region_params['us-east-1'],
                          {'region_name': 'us-east-1', 'az1': 'us-east-1e'})
-        self.assertEqual(region_params['us-west-2'], {})
+        self.assertEqual(self.db.create_region_item.call_count, 1)
