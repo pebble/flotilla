@@ -2,7 +2,9 @@ FROM alpine:3.2
 
 RUN apk add --update \
     git \
+    g++ \
     python \
+    python-dev \
     py-pip \
     py-dbus \
   && pip install virtualenv \
