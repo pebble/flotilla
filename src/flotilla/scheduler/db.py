@@ -1,5 +1,7 @@
 import logging
 import time
+import boto.vpc
+from boto.exception import BotoServerError
 from boto.dynamodb2.items import Item
 from collections import defaultdict
 
@@ -111,9 +113,44 @@ class FlotillaSchedulerDynamo(object):
 
         return assignments
 
+    @staticmethod
+    def create_region_item(region):
+        region_item = {
+            'region_name': region
+        }
+
+        vpc = boto.vpc.connect_to_region(region)
+        try:
+            vpcs = vpc.get_all_vpcs()
+            invalid_az = region + '-zzz'
+            vpc.create_subnet(vpcs[0].id, '172.31.192.0/20',
+                              availability_zone=invalid_az)
+        except BotoServerError as e:
+            if 'Subnets can currently only be created in ' \
+               'the following availability zones' not in e.message:
+                raise e
+            message_split = e.message.split(region)
+            # Invalid region is echoed back, every mention after that is an AZ:
+            azs = [s[0] for s in message_split[2:]]
+            for az_index in range(3):
+                az = az_index % len(azs)
+                region_item['az%d' % (az_index + 1)] = region + azs[az]
+        return region_item
+
     def get_region_params(self, regions):
         keys = [{'region_name': region} for region in regions]
-        region_params = {region: {} for region in regions}
+        region_params = {}
         for item in self._regions.batch_get(keys):
             region_params[item['region_name']] = dict(item)
+
+        new_regions = []
+        for region in regions:
+            if region not in region_params:
+                new_region = self.create_region_item(region)
+                region_params[region] = new_region
+                new_regions.append(region)
+        if new_regions:
+            with self._regions.batch_write() as region_batch:
+                region_batch.put_item(new_region)
+
         return region_params
