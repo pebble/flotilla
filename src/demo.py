@@ -45,12 +45,12 @@ def sync_cloudformation(cloudformation):
 
 
 if __name__ == '__main__':
-    home_region = 'us-east-1'
-    cloudformation = boto.cloudformation.connect_to_region(home_region)
+    db_region = 'us-east-1'
+    cloudformation = boto.cloudformation.connect_to_region(db_region)
     cf_stack = sync_cloudformation(cloudformation)
 
-    dynamo = boto.dynamodb2.connect_to_region(home_region)
-    kms = boto.kms.connect_to_region(home_region)
+    dynamo = boto.dynamodb2.connect_to_region(db_region)
+    kms = boto.kms.connect_to_region(db_region)
     tables = DynamoDbTables(dynamo, environment='develop')
     tables.setup(['assignments', 'regions', 'revisions', 'services', 'units'])
     db = FlotillaClientDynamo(tables.assignments, tables.regions,
