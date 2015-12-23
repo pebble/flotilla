@@ -19,7 +19,8 @@ SERVICE_KEYS_STRINGS = ('coreos_channel',
                         'health_check',
                         'instance_max',
                         'instance_min',
-                        'instance_type')
+                        'instance_type',
+                        'kms_key')
 
 SERVICE_KEYS_ITERABLE = ('private_ports',
                          'public_ports',

@@ -57,13 +57,6 @@ if __name__ == '__main__':
                               tables.revisions, tables.services, tables.units,
                               kms)
 
-    # Configure host regions
-    db.configure_regions(['us-east-1'], {
-        'az1': 'us-east-1a',
-        'az2': 'us-east-1c',
-        'az3': 'us-east-1d'
-    })
-
     # Autoprovisioned ElasticSearch service:
     elasticsearch_dns = 'elasticsearch-develop.mycloudand.me'
     db.configure_service('elasticsearch', {
@@ -74,7 +67,6 @@ if __name__ == '__main__':
         'instance_type': 't2.small',
         'elb_scheme': 'internal',
         'dns_name': elasticsearch_dns,
-        'log_driver': 'fluentd'
     })
     elasticsearch = FlotillaDockerService('elasticsearch.service',
                                           'pwagner/elasticsearch-aws:latest',
@@ -91,7 +83,6 @@ if __name__ == '__main__':
         'public_ports': {80: 'HTTP'},
         'health_check': 'HTTP:80/',
         'instance_type': 't2.micro',
-        'log_driver': 'fluentd'
     })
     es_url = 'http://%s:9200' % elasticsearch_dns
     kibana = FlotillaDockerService('kibana.service',
