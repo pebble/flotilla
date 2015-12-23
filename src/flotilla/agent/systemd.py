@@ -85,7 +85,7 @@ class SystemdUnits(object):
                         for key, value in unit.environment.items():
                             env_file.write(key)
                             env_file.write('=')
-                            env_file.write(value)
+                            env_file.write(str(value))
                             env_file.write('\n')
 
             try:
