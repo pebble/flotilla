@@ -87,6 +87,11 @@
       "Type": "String",
       "Default": "us-east-1",
       "Description": "DynamoDB region"
+    },
+    "KmsKey": {
+      "Type": "String",
+      "Default": "",
+      "Description": "KMS key id."
     }
   },
   "Conditions": {
@@ -94,6 +99,16 @@
       "Fn::Equals": [
         {"Ref": "ElbScheme"},
         "internet-facing"
+      ]
+    },
+    "HasKms": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {"Ref": "KmsKey"},
+            ""
+          ]
+        }
       ]
     }
   },
@@ -333,6 +348,37 @@
                 }
               ]
             }
+          },
+          {
+            "Fn::If": [
+              "HasKms",
+              {
+                "PolicyName": "KmsDecrypt",
+                "PolicyDocument": {
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": [
+                        "kms:Decrypt"
+                      ],
+                      "Resource": {
+                        "Fn::Join": [
+                          "", [
+                            "arn:aws:kms:",
+                            {"Ref": "DynamoDbRegion"},
+                            ":",
+                            {"Ref": "AWS::AccountId"},
+                            ":key/",
+                            {"Ref": "KmsKey"}
+                          ]
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {"Ref": "AWS::NoValue"}
+            ]
           }
         ],
         "Path": "/"

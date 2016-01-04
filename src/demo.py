@@ -45,24 +45,17 @@ def sync_cloudformation(cloudformation):
 
 
 if __name__ == '__main__':
-    home_region = 'us-east-1'
-    cloudformation = boto.cloudformation.connect_to_region(home_region)
+    db_region = 'us-east-1'
+    cloudformation = boto.cloudformation.connect_to_region(db_region)
     cf_stack = sync_cloudformation(cloudformation)
 
-    dynamo = boto.dynamodb2.connect_to_region(home_region)
-    kms = boto.kms.connect_to_region(home_region)
+    dynamo = boto.dynamodb2.connect_to_region(db_region)
+    kms = boto.kms.connect_to_region(db_region)
     tables = DynamoDbTables(dynamo, environment='develop')
     tables.setup(['assignments', 'regions', 'revisions', 'services', 'units'])
     db = FlotillaClientDynamo(tables.assignments, tables.regions,
                               tables.revisions, tables.services, tables.units,
                               kms)
-
-    # Configure host regions
-    db.configure_regions(['us-east-1'], {
-        'az1': 'us-east-1a',
-        'az2': 'us-east-1c',
-        'az3': 'us-east-1d'
-    })
 
     # Autoprovisioned ElasticSearch service:
     elasticsearch_dns = 'elasticsearch-develop.mycloudand.me'
@@ -74,7 +67,6 @@ if __name__ == '__main__':
         'instance_type': 't2.small',
         'elb_scheme': 'internal',
         'dns_name': elasticsearch_dns,
-        'log_driver': 'fluentd'
     })
     elasticsearch = FlotillaDockerService('elasticsearch.service',
                                           'pwagner/elasticsearch-aws:latest',
@@ -91,7 +83,6 @@ if __name__ == '__main__':
         'public_ports': {80: 'HTTP'},
         'health_check': 'HTTP:80/',
         'instance_type': 't2.micro',
-        'log_driver': 'fluentd'
     })
     es_url = 'http://%s:9200' % elasticsearch_dns
     kibana = FlotillaDockerService('kibana.service',

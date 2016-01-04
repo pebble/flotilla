@@ -248,6 +248,7 @@
                     "iam:PassRole",
                     "iam:PutRolePolicy",
                     "iam:RemoveRoleFromInstanceProfile",
+                    "iam:UpdateAssumeRolePolicy",
                     "route53:ChangeResourceRecordSets",
                     "route53:GetChange",
                     "route53:ListHostedZones",
@@ -330,7 +331,8 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:BatchGetItem"
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem"
                   ],
                   "Resource": {
                     "Fn::Join": [

@@ -19,7 +19,8 @@ SERVICE_KEYS_STRINGS = ('coreos_channel',
                         'health_check',
                         'instance_max',
                         'instance_min',
-                        'instance_type')
+                        'instance_type',
+                        'kms_key')
 
 SERVICE_KEYS_ITERABLE = ('private_ports',
                          'public_ports',
@@ -46,6 +47,8 @@ class FlotillaCloudFormation(object):
         self._environment = environment
         self._domain = domain
         self._coreos = coreos
+        # FIXME: input as param
+        self._db_region = 'us-east-1'
         with open('cloudformation/vpc.template') as template_in:
             self._vpc = template_in.read()
         with open('cloudformation/service-elb.template') as template_in:
@@ -155,37 +158,35 @@ class FlotillaCloudFormation(object):
 
     def _service_params(self, region, service, vpc_outputs):
         service_name = service['service_name']
-        service_params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
-        service_params['FlotillaEnvironment'] = self._environment
-        service_params['ServiceName'] = service_name
+        params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
+        params['FlotillaEnvironment'] = self._environment
+        params['DynamoDbRegion'] = self._db_region
+        params['ServiceName'] = service_name
         # FIXME: HA by default, don't be cheap
-        service_params['InstanceType'] = service.get('instance_type', 't2.nano')
+        params['InstanceType'] = service.get('instance_type', 't2.nano')
         instance_min = service.get('instance_min', '1')
-        service_params['InstanceMin'] = instance_min
-        service_params['InstanceMax'] = service.get('instance_max',
-                                                    instance_min)
-        service_params['HealthCheckTarget'] = service.get('health_check',
-                                                          'TCP:80')
-        service_params['ElbScheme'] = service.get('elb_scheme',
-                                                  'internet-facing')
+        params['InstanceMin'] = instance_min
+        params['InstanceMax'] = service.get('instance_max', instance_min)
+        params['HealthCheckTarget'] = service.get('health_check', 'TCP:80')
+        params['ElbScheme'] = service.get('elb_scheme', 'internet-facing')
+        params['KmsKey'] = service.get('kms_key', '')
 
         dns_name = service.get('dns_name')
         if dns_name:
             domain = dns_name.split('.')
             domain = '.'.join(domain[-2:]) + '.'
-            service_params['VirtualHostDomain'] = domain
-            service_params['VirtualHost'] = dns_name
+            params['VirtualHostDomain'] = domain
+            params['VirtualHost'] = dns_name
         else:
-            service_params['VirtualHostDomain'] = self._domain + '.'
+            params['VirtualHostDomain'] = self._domain + '.'
             generated_dns = '%s-%s.%s' % (service_name, self._environment,
                                           self._domain)
-            service_params['VirtualHost'] = generated_dns
-
+            params['VirtualHost'] = generated_dns
         coreos_channel = service.get('coreos_channel', 'stable')
         coreos_version = service.get('coreos_version', 'current')
         ami = self._coreos.get_ami(coreos_channel, coreos_version, region)
-        service_params['Ami'] = ami
-        return service_params
+        params['Ami'] = ami
+        return params
 
     def _stack(self, region, name, template, params):
         """

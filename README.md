@@ -9,7 +9,7 @@ Flotilla uses:
 * DynamoDb - for persistence, locking and communication
 * ELB - to reroute traffic during an upgrade
 * IAM - for access control
-* KMS - for encryption of environment variables (TODO)
+* KMS - for encryption of environment variables
 
 Like fleet, flotilla distributes [systemd units](http://www.freedesktop.org/software/systemd/man/systemd.unit.html) across a cluster of machines.
 

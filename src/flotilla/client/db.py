@@ -72,10 +72,7 @@ class FlotillaClientDynamo(object):
                 env = unit.environment
                 if env:
                     if key:
-                        encrypted, key = self._encrypt_environment(key, env)
-                        unit_item['environment_crypt'] = encrypted.encode(
-                            'base64')
-                        unit_item['environment_key'] = key.encode('base64')
+                        self._encrypt_environment(key, env, unit_item)
                     else:
                         unit_item['environment'] = env
                 batch.put_item(data=unit_item)
@@ -90,7 +87,7 @@ class FlotillaClientDynamo(object):
 
         return rev_hash
 
-    def _encrypt_environment(self, key_id, environment):
+    def _encrypt_environment(self, key_id, environment, unit_item):
         kms_key = self._kms.generate_data_key(key_id, key_spec='AES_256')
         plaintext_key = kms_key['Plaintext']
         encrypted_key = kms_key['CiphertextBlob']
@@ -98,8 +95,11 @@ class FlotillaClientDynamo(object):
         iv = Random.new().read(AES.block_size)
         cipher = AES.new(plaintext_key, AES.MODE_CBC, iv)
         environment_json = json.dumps(environment)
-        msg = iv + cipher.encrypt(aes_pad(environment_json))
-        return msg, encrypted_key
+        environment_encrypted = cipher.encrypt(aes_pad(environment_json))
+
+        unit_item['environment_iv'] = iv.encode('base64')
+        unit_item['environment_key'] = encrypted_key.encode('base64')
+        unit_item['environment_data'] = environment_encrypted.encode('base64')
 
     def del_revision(self, service, rev_hash):
         try:
