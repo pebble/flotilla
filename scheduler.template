@@ -331,8 +331,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:BatchGetItem",
-                    "dynamodb:BatchWriteItem"
+                    "dynamodb:BatchGetItem"
                   ],
                   "Resource": {
                     "Fn::Join": [
