@@ -1,7 +1,6 @@
 # #!/usr/bin/env python
 
 import logging
-import boto.cloudformation
 import boto.dynamodb2
 import boto.kms
 from boto.exception import BotoServerError
@@ -17,37 +16,8 @@ logging.getLogger('requests').setLevel(logging.CRITICAL)
 
 stack_name = 'flotilla-develop'
 
-with open('../scheduler.template') as template_in:
-    stack_body = template_in.read()
-
-
-def sync_cloudformation(cloudformation):
-    logger.debug('Creating CloudFormation stack...')
-    try:
-        cloudformation.update_stack(stack_name, template_body=stack_body,
-                                    capabilities=['CAPABILITY_IAM'])
-    except BotoServerError as e:
-        if e.error_code == 'ValidationError':
-            if e.message == 'No updates are to be performed.':
-                logger.debug('CloudFormation already in sync.')
-            else:
-                cloudformation.create_stack(stack_name,
-                                            template_body=stack_body,
-                                            capabilities=['CAPABILITY_IAM'])
-        else:
-            raise e
-    stack = cloudformation.describe_stacks(stack_name)[0]
-    while stack.stack_status not in ('UPDATE_COMPLETE', 'CREATE_COMPLETE'):
-        logger.debug('Waiting for CloudFormation: %s', stack.stack_status)
-        time.sleep(2)
-        stack = cloudformation.describe_stacks(stack_name)[0]
-    return stack
-
-
 if __name__ == '__main__':
     db_region = 'us-east-1'
-    cloudformation = boto.cloudformation.connect_to_region(db_region)
-    cf_stack = sync_cloudformation(cloudformation)
 
     dynamo = boto.dynamodb2.connect_to_region(db_region)
     kms = boto.kms.connect_to_region(db_region)

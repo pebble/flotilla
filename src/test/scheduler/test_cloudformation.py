@@ -3,13 +3,15 @@ from mock import MagicMock, patch, ANY
 from boto.exception import BotoServerError
 from boto.cloudformation.connection import CloudFormationConnection
 from boto.cloudformation.stack import Stack
-from flotilla.scheduler.cloudformation import FlotillaCloudFormation
+from flotilla.scheduler.cloudformation import FlotillaCloudFormation, \
+    CAPABILITIES
 from flotilla.scheduler.coreos import CoreOsAmiIndex
 
 ENVIRONMENT = 'test'
 DOMAIN = 'test.com'
 NAME = 'service'
 REGION = 'us-east-1'
+REGIONS = (REGION, 'us-west-2')
 STACK_ARN = 'stack_arn'
 TEMPLATE = '{}'
 
@@ -24,7 +26,8 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.service = {
             'service_name': NAME
         }
-        self.cf = FlotillaCloudFormation(ENVIRONMENT, DOMAIN, self.coreos)
+        self.cf = FlotillaCloudFormation(ENVIRONMENT, DOMAIN, self.coreos,
+                                         backoff=0.001)
 
     @patch('boto.cloudformation.connect_to_region')
     def test_client_cache(self, mock_connect):
@@ -75,7 +78,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
 
         self.cloudformation.create_stack. \
             assert_called_with(NAME,
-                               capabilities=['CAPABILITY_IAM'],
+                               capabilities=CAPABILITIES,
                                template_body=TEMPLATE,
                                parameters=ANY)
         self.cloudformation.update_stack.assert_not_called()
@@ -100,7 +103,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cloudformation.create_stack.assert_not_called()
         self.cloudformation.update_stack. \
             assert_called_with(NAME,
-                               capabilities=['CAPABILITY_IAM'],
+                               capabilities=CAPABILITIES,
                                template_body=TEMPLATE,
                                parameters=ANY)
         self.assertEqual(stack.stack_id, STACK_ARN)
@@ -175,6 +178,72 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.assertEqual(params['Az1'], 'us-east-1a')
         self.assertEqual(params['Az2'], 'us-east-1b')
         self.assertEqual(params['Az3'], 'us-east-1c')
+
+    def test_tables_done(self):
+        self.mock_client()
+        self.cf._stack = MagicMock(return_value=self.stack)
+
+        self.cf.tables(REGIONS)
+
+        self.assertEqual(self.cf._stack.call_count, len(REGIONS))
+        self.cloudformation.describe_stacks.assert_not_called()
+
+    def test_tables_wait(self):
+        self.mock_client()
+        self.cf._stack = MagicMock()
+
+        self.cf.tables(REGIONS)
+
+        self.assertEqual(self.cloudformation.describe_stacks.call_count,
+                         len(REGIONS))
+
+    def test_scheduler_for_regions(self):
+        template = self.cf._scheduler_for_regions(('ap-northeast-1',))
+        self.assertTrue(template.find('ap-northeast-1') != 1)
+        self.assertTrue(template.find('us-east-1') != 1)
+
+    def test_schedulers_every(self):
+        self.mock_client()
+        self.cf._stack = MagicMock()
+        regions = {
+            REGION: {
+                'scheduler': True,
+                'scheduler_instance_type': 't2.nano',
+                'scheduler_coreos_channel': 'stable',
+                'scheduler_coreos_version': 'current',
+                'az1': 'us-east-1a',
+                'az2': 'us-east-1b',
+                'az3': 'us-east-1c',
+            }
+        }
+
+        self.cf.schedulers(regions)
+
+        self.cf._stack.assert_called_with(REGION, 'flotilla-test-scheduler',
+                                          self.cf._scheduler, ANY)
+
+    def test_schedulers_light(self):
+        self.mock_client()
+        self.cf._stack = MagicMock()
+        self.cf._scheduler_for_regions = MagicMock()
+        regions = {
+            REGION: {
+                'scheduler': True,
+                'scheduler_instance_type': 't2.nano',
+                'scheduler_coreos_channel': 'stable',
+                'scheduler_coreos_version': 'current',
+                'az1': 'us-east-1a',
+                'az2': 'us-east-1b',
+                'az3': 'us-east-1c',
+            },
+            'us-west-2': {}
+        }
+
+        self.cf.schedulers(regions)
+
+        self.cf._scheduler_for_regions.assert_called_with(ANY)
+        self.cf._stack.assert_called_with(REGION, 'flotilla-test-scheduler',
+                                          ANY, ANY)
 
     def mock_client(self):
         self.cf._client = MagicMock(return_value=self.cloudformation)
