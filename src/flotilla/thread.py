@@ -30,9 +30,10 @@ class RepeatingFunc(threading.Thread):
             else:
                 sleep_time = interval - duration
                 logger.debug(
-                    'Function took %f, sleeping for %f to maintain %f.',
-                    duration, sleep_time, interval)
+                        'Function took %f, sleeping for %f to maintain %f.',
+                        duration, sleep_time, interval)
                 time.sleep(sleep_time)
+        logger.debug('Thread done.')
 
     def stop(self):
         self._live = False
