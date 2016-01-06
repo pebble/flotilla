@@ -28,3 +28,6 @@ REGIONS = ('ap-northeast-1',
            'us-gov-west-1',
            'us-west-1',
            'us-west-2')
+
+DEFAULT_REGIONS = ('us-east-1',)
+DEFAULT_ENVIRONMENT = 'develop'

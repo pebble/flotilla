@@ -457,7 +457,7 @@
                 "        ExecStart=/usr/bin/docker run --name flotilla-scheduler",
                 " -e FLOTILLA_ENV=", {"Ref": "FlotillaEnvironment"},
                 " -e FLOTILLA_DOMAIN=", {"Ref": "FlotillaDomain"},
-                " pwagner/flotilla /env/bin/python /app/scheduler.py", "\n",
+                " pwagner/flotilla scheduler", "\n",
                 "        ExecStop=/usr/bin/docker stop flotilla-scheduler",
                 "\n",
                 "\n",

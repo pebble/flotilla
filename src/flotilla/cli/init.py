@@ -1,7 +1,7 @@
 import click
 import logging
 from more_itertools import unique_everseen
-from main import setup_logging, REGIONS
+from main import setup_logging, REGIONS, DEFAULT_REGIONS, DEFAULT_ENVIRONMENT
 
 from flotilla.client import RegionMetadata
 from flotilla.scheduler import CoreOsAmiIndex, FlotillaCloudFormation
@@ -15,8 +15,6 @@ CHANNELS = ('stable',
             'beta',
             'alpha')
 
-DEFAULT_REGIONS = ('us-east-1',)
-DEFAULT_ENVIRONMENT = 'develop'
 DEFAULT_INSTANCE_TYPE = 't2.nano'
 DEFAULT_CHANNEL = 'stable'
 DEFAULT_VERSION = 'current'

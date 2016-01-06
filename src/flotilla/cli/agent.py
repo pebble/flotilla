@@ -38,7 +38,7 @@ def agent_cmd():  # pragma: no cover
               envvar='FLOTILLA_HEALTH_INTERVAL', default=15,
               help='Frequency of health writes (seconds).')
 @click.option('--assignment-interval', type=click.INT,
-              envvar='FLOTILLA_ASSIGNMENT', default=15,
+              envvar='FLOTILLA_ASSIGNMENT_INTERVAL', default=15,
               help='Frequency of assignment reads (seconds).')
 def agent(service, environment, region, elb, health_interval,
           assignment_interval):  # pragma: no cover

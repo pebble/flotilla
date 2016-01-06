@@ -17,5 +17,5 @@ RUN virtualenv --system-site-packages /env && /env/bin/pip install -r /app/requi
 COPY src/ /app
 
 WORKDIR /app
-CMD ["/env/bin/python", "agent.py"]
 
+ENTRYPOINT  ["/env/bin/python", "flotilla.py"]
