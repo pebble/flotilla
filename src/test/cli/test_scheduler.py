@@ -19,3 +19,16 @@ class TestScheduler(unittest.TestCase):
         start_scheduler(ENVIRONMENT, DOMAIN, REGIONS, 0.1, 0.1, 0.1)
 
         self.assertEquals(3, repeat.call_count)
+
+    @patch('flotilla.cli.scheduler.get_instance_id')
+    @patch('flotilla.cli.scheduler.DynamoDbTables')
+    @patch('flotilla.cli.scheduler.RepeatingFunc')
+    @patch('boto.dynamodb2.connect_to_region')
+    def test_start_scheduler_multiregion(self, dynamo, repeat, tables,
+                                         get_instance_id):
+        get_instance_id.return_value = 'i-123456'
+
+        start_scheduler(ENVIRONMENT, DOMAIN, ['us-east-1', 'us-west-2'], 0.1,
+                        0.1, 0.1)
+
+        self.assertEquals(6, repeat.call_count)

@@ -18,6 +18,7 @@ def get_instance_id():
 
 
 REGIONS = ('ap-northeast-1',
+           'ap-northeast-2',
            'ap-southeast-1',
            'ap-southeast-2',
            'cn-north-1',
@@ -25,7 +26,6 @@ REGIONS = ('ap-northeast-1',
            'eu-west-1',
            'sa-east-1',
            'us-east-1',
-           'us-gov-west-1',
            'us-west-1',
            'us-west-2')
 

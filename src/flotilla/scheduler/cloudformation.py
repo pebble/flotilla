@@ -243,7 +243,9 @@ class FlotillaCloudFormation(object):
         template = self._template('scheduler')
         for params in region_params.values():
             if not params.get('scheduler'):
-                template = self._scheduler_for_regions(region_params.keys())
+                regions = region_params.keys()
+                template = self._scheduler_for_regions(regions)
+                base_params['FlotillaRegion'] = ' '.join(regions)
                 break
 
         # Create scheduler stacks:
@@ -260,6 +262,9 @@ class FlotillaCloudFormation(object):
                     region)
             for i in range(1, 4):
                 scheduler_params['Az%d' % i] = params['az%d' % i]
+
+            if 'FlotillaRegion' not in scheduler_params:
+                scheduler_params['FlotillaRegion'] = region
 
             scheduler_stacks[region] = self._stack(region, name, template,
                                                    scheduler_params)
