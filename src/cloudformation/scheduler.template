@@ -431,6 +431,7 @@
         "ImageId": {"Ref": "Ami"},
         "SecurityGroups": [{"Ref": "SecurityGroup"}],
         "AssociatePublicIpAddress": "true",
+        "IamInstanceProfile": {"Ref": "InstanceProfile"},
         "UserData": {
           "Fn::Base64": {
             "Fn::Join": [
@@ -489,7 +490,7 @@
           {
             "Key": "Name",
             "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "scheduler"]]
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}]]
             },
             "PropagateAtLaunch": true
           }

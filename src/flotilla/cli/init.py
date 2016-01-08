@@ -60,3 +60,4 @@ def bootstrap(region, environment, domain, instance_type, coreos_channel,
     region_params = region_meta.store_regions(regions, available, instance_type,
                                               coreos_channel, coreos_version)
     cloudformation.schedulers(region_params)
+    logger.info('Bootstrap complete')
