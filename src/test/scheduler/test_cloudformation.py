@@ -171,7 +171,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf.vpc(REGION, {})
 
         self.cf._stack.assert_called_with(REGION, 'flotilla-test-vpc',
-                                          self.cf._vpc, {})
+                                          self.cf._template('vpc'), {})
 
     def test_vpc_params_empty(self):
         params = self.cf._vpc_params(REGION, {})
@@ -220,7 +220,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf.schedulers(regions)
 
         self.cf._stack.assert_called_with(REGION, 'flotilla-test-scheduler',
-                                          self.cf._scheduler, ANY)
+                                          self.cf._template('scheduler'), ANY)
 
     def test_schedulers_light(self):
         self.mock_client()

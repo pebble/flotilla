@@ -52,17 +52,17 @@ class FlotillaCloudFormation(object):
         self._domain = domain
         self._coreos = coreos
         self._backoff = backoff
+        self._templates = {}
 
-        # FIXME: input as param
-        self._db_region = 'us-east-1'
-        with open('cloudformation/vpc.template') as template_in:
-            self._vpc = template_in.read()
-        with open('cloudformation/service-elb.template') as template_in:
-            self._service_elb = template_in.read()
-        with open('cloudformation/tables.template') as template_in:
-            self._tables = template_in.read()
-        with open('cloudformation/scheduler.template') as template_in:
-            self._scheduler = template_in.read()
+    def _template(self, template):
+        cached = self._templates.get(template)
+        if cached:
+            return cached
+
+        with open('cloudformation/%s.template' % template) as template_in:
+            loaded = template_in.read()
+            self._templates[template] = loaded
+            return loaded
 
     def vpc(self, region, params=None):
         """
@@ -72,7 +72,7 @@ class FlotillaCloudFormation(object):
         :return: CloudFormation Stack.
         """
         name = 'flotilla-{0}-vpc'.format(self._environment)
-        return self._stack(region, name, self._vpc, params)
+        return self._stack(region, name, self._template('vpc'), params)
 
     def _vpc_params(self, region_name, region):
         nat_coreos_channel = region.get('nat_coreos_channel', 'stable')
@@ -104,7 +104,7 @@ class FlotillaCloudFormation(object):
         name = 'flotilla-{0}-{1}'.format(self._environment,
                                          service['service_name'])
         service_params = self._service_params(region, service, vpc_outputs)
-        json_template = json.loads(self._service_elb)
+        json_template = json.loads(self._template('service-elb'))
         resources = json_template['Resources']
 
         # Public ports are exposed to ELB, as a listener by ELB:
@@ -170,7 +170,6 @@ class FlotillaCloudFormation(object):
         service_name = service['service_name']
         params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
         params['FlotillaEnvironment'] = self._environment
-        params['DynamoDbRegion'] = self._db_region
         params['ServiceName'] = service_name
         # FIXME: HA by default, don't be cheap
         params['InstanceType'] = service.get('instance_type', 't2.nano')
@@ -210,7 +209,7 @@ class FlotillaCloudFormation(object):
 
         # Create/update stack in each region:
         table_stacks = {
-            region: self._stack(region, name, self._tables, params)
+            region: self._stack(region, name, self._template('tables'), params)
             for region in regions}
 
         self._wait_for_stacks(table_stacks)
@@ -241,7 +240,7 @@ class FlotillaCloudFormation(object):
         }
 
         # If there are regions without a local scheduler, hack IAM Role
-        template = self._scheduler
+        template = self._template('scheduler')
         for params in region_params.values():
             if not params.get('scheduler'):
                 template = self._scheduler_for_regions(region_params.keys())
@@ -272,7 +271,7 @@ class FlotillaCloudFormation(object):
         :param regions: Region list.
         :return: Customized template.
         """
-        template_json = json.loads(self._scheduler)
+        template_json = json.loads(self._template('scheduler'))
         resources = template_json['Resources']
         for role_policy in resources['Role']['Properties']['Policies']:
             if role_policy['PolicyName'] != 'FlotillaDynamo':
@@ -342,7 +341,7 @@ class FlotillaCloudFormation(object):
         :param params: VPC parameters
         :return: Hash.
         """
-        return sha256(self._vpc, params)
+        return sha256(self._template('vpc'), params)
 
     def service_hash(self, service, vpc_outputs):
         """
@@ -362,7 +361,7 @@ class FlotillaCloudFormation(object):
             value = service.get(key)
             if value:
                 params[key] = value
-        return sha256(self._service_elb, params)
+        return sha256(self._template('service-elb'), params)
 
     def _client(self, region):
         client = self._clients.get(region)
