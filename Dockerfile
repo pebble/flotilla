@@ -1,5 +1,7 @@
 FROM alpine:3.3
 
+COPY requirements.txt /app/requirements.txt
+
 RUN apk add --update \
     git \
     g++ \
@@ -7,15 +9,16 @@ RUN apk add --update \
     python-dev \
     py-pip \
     py-dbus \
-  && pip install virtualenv \
+  && pip install -r /app/requirements.txt \
+  && apk del \
+     git \
+     g++ \
+     python-dev \
   && rm -rf /var/cache/apk/*
-
-
-COPY requirements.txt /app/requirements.txt
-RUN virtualenv --system-site-packages /env && /env/bin/pip install -r /app/requirements.txt
 
 COPY src/ /app
 
 WORKDIR /app
 
-ENTRYPOINT  ["/env/bin/python", "flotilla.py"]
+ENTRYPOINT  ["python", "flotilla.py"]
+
