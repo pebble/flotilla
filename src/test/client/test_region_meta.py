@@ -27,8 +27,8 @@ class TestRegionMetadata(unittest.TestCase):
         self.mock_subnet_error(mock_connect, message)
 
         region_item = self.region_meta._create_region_item(REGION)
-        self.assertEqual(region_item['az1'], 'us-east-1c')
-        self.assertEqual(region_item['az2'], 'us-east-1a')
+        self.assertEqual(region_item['az1'], 'us-east-1a')
+        self.assertEqual(region_item['az2'], 'us-east-1c')
         self.assertEqual(region_item['az3'], 'us-east-1d')
         self.assertEqual(region_item['region_name'], REGION)
 
@@ -40,9 +40,9 @@ class TestRegionMetadata(unittest.TestCase):
         self.mock_subnet_error(mock_connect, message)
 
         region_item = self.region_meta._create_region_item(REGION)
-        self.assertEqual(region_item['az1'], 'us-east-1c')
-        self.assertEqual(region_item['az2'], 'us-east-1a')
-        self.assertEqual(region_item['az3'], 'us-east-1c')
+        self.assertEqual(region_item['az1'], 'us-east-1a')
+        self.assertEqual(region_item['az2'], 'us-east-1c')
+        self.assertEqual(region_item['az3'], 'us-east-1a')
 
     @patch('boto.vpc.connect_to_region')
     def test_create_region_item_exception(self, mock_connect):

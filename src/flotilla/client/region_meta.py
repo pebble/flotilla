@@ -55,7 +55,7 @@ class RegionMetadata(object):
                 raise e
             message_split = e.message.split(region)
             # Invalid region is echoed back, every mention after that is an AZ:
-            azs = [s[0] for s in message_split[2:]]
+            azs = sorted([s[0] for s in message_split[2:]])
             for az_index in range(3):
                 az = az_index % len(azs)
                 region_item['az%d' % (az_index + 1)] = region + azs[az]
