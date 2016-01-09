@@ -415,6 +415,34 @@
                 }
               ]
             }
+          },
+          {
+            "PolicyName": "FlotillaQueue",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueUrl",
+                    "sqs:ReceiveMessage"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:sqs:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-scheduler"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
           }
         ]
       }

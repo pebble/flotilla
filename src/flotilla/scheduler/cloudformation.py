@@ -279,18 +279,20 @@ class FlotillaCloudFormation(object):
         template_json = json.loads(self._template('scheduler'))
         resources = template_json['Resources']
         for role_policy in resources['Role']['Properties']['Policies']:
-            if role_policy['PolicyName'] != 'FlotillaDynamo':
+            policy_name = role_policy['PolicyName']
+            if policy_name not in ('FlotillaDynamo', 'FlotillaQueue'):
                 continue
 
-            dynamo_statements = role_policy['PolicyDocument']['Statement']
-            for dynamo_statement in dynamo_statements:
+            statements = role_policy['PolicyDocument']['Statement']
+            for statement in statements:
                 # Replace "this region" reference with every managed region:
                 new_resources = []
                 for region in regions:
-                    region_resource = deepcopy(dynamo_statement['Resource'])
+                    region_resource = deepcopy(statement['Resource'])
                     region_resource['Fn::Join'][1][1] = region
                     new_resources.append(region_resource)
-                dynamo_statement['Resource'] = new_resources
+                statement['Resource'] = new_resources
+
         return json.dumps(template_json)
 
     def _stack(self, region, name, template, params):
