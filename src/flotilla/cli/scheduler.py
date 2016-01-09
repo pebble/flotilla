@@ -61,24 +61,26 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
 
         sqs = boto.sqs.connect_to_region(region)
         message_q = sqs.get_queue(
-            'flotilla-%s-scheduler-messages' % environment)
+                'flotilla-%s-scheduler' % environment)
 
         # Assemble into scheduler:
         schedule = FlotillaScheduler(db, locks, lock_ttl=lock_interval * 3)
         provisioner = FlotillaProvisioner(environment, schedule, db,
                                           cloudformation)
-        messaging = FlotillaSchedulerMessaging(message_q, scheduler)
 
         funcs += [
             RepeatingFunc('scheduler-lock-%s' % region, schedule.lock,
                           lock_interval),
             RepeatingFunc('scheduler-%s' % region, schedule.loop,
                           loop_interval),
-            RepeatingFunc('scheduler-message-%s' % region, messaging.receive,
-                          21),
             RepeatingFunc('provisioner-%s' % region, provisioner.provision,
                           provision_interval)
         ]
+
+        if message_q:
+            messaging = FlotillaSchedulerMessaging(message_q, scheduler)
+            funcs.append(RepeatingFunc('scheduler-message-%s' % region,
+                                       messaging.receive, 21))
 
     # Start loops:
     map(RepeatingFunc.start, funcs)
