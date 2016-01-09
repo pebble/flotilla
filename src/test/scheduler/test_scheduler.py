@@ -97,3 +97,20 @@ class TestFlotillaScheduler(unittest.TestCase):
         self.locks.try_lock.return_value = False
         self.scheduler.lock()
         self.assertFalse(self.scheduler.active)
+
+    def test_schedule_service_not_active(self):
+        self.scheduler.active = False
+
+        self.scheduler.schedule_service(SERVICE)
+
+        self.db.get_revision_weights.assert_not_called()
+        self.db.get_instance_assignments.assert_not_called()
+
+    def test_schedule_service(self):
+        weights = {REVISION: 1, REVISION2: 1}
+        self.db.get_revision_weights.return_value = weights
+        self.scheduler._schedule_service = MagicMock()
+
+        self.scheduler.schedule_service(SERVICE)
+
+        self.scheduler._schedule_service.assert_called_with(SERVICE, weights)
