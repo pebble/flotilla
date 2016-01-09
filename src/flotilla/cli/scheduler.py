@@ -78,9 +78,9 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
         ]
 
         if message_q:
-            messaging = FlotillaSchedulerMessaging(message_q, scheduler)
+            messaging = FlotillaSchedulerMessaging(message_q, schedule)
             funcs.append(RepeatingFunc('scheduler-message-%s' % region,
-                                       messaging.receive, 21))
+                                       messaging.receive, 20.1))
 
     # Start loops:
     map(RepeatingFunc.start, funcs)
