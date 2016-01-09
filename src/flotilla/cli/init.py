@@ -1,15 +1,13 @@
 import click
 import logging
 from more_itertools import unique_everseen
-from main import setup_logging, REGIONS, DEFAULT_REGIONS, DEFAULT_ENVIRONMENT
+from main import setup_logging, INSTANCE_TYPES, REGIONS, DEFAULT_REGIONS, \
+    DEFAULT_ENVIRONMENT
 
 from flotilla.client import RegionMetadata
 from flotilla.scheduler import CoreOsAmiIndex, FlotillaCloudFormation
 
 logger = logging.getLogger('flotilla')
-
-INSTANCE_TYPES = ('t2.nano',
-                  't2.micro')
 
 CHANNELS = ('stable',
             'beta',

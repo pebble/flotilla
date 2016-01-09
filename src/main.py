@@ -29,5 +29,9 @@ REGIONS = ('ap-northeast-1',
            'us-west-1',
            'us-west-2')
 
+INSTANCE_TYPES = ('t2.nano',
+                  't2.micro',
+                  't2.small')
+
 DEFAULT_REGIONS = ('us-east-1',)
 DEFAULT_ENVIRONMENT = 'develop'
