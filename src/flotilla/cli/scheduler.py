@@ -1,12 +1,12 @@
 import click
 import logging
 import boto.dynamodb2
+import boto.sqs
 
 from main import get_instance_id, setup_logging, REGIONS, DEFAULT_REGIONS, \
     DEFAULT_ENVIRONMENT
 from flotilla.db import DynamoDbTables, DynamoDbLocks
-from flotilla.scheduler import FlotillaCloudFormation, FlotillaSchedulerDynamo, \
-    FlotillaScheduler, CoreOsAmiIndex, FlotillaProvisioner
+from flotilla.scheduler import *
 from flotilla.thread import RepeatingFunc
 
 logger = logging.getLogger('flotilla')
@@ -59,16 +59,23 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
                                      tables.status)
         locks = DynamoDbLocks(instance_id, tables.locks)
 
+        sqs = boto.sqs.connect_to_region(region)
+        message_q = sqs.get_queue(
+            'flotilla-%s-scheduler-messages' % environment)
+
         # Assemble into scheduler:
         schedule = FlotillaScheduler(db, locks, lock_ttl=lock_interval * 3)
         provisioner = FlotillaProvisioner(environment, schedule, db,
                                           cloudformation)
+        messaging = FlotillaSchedulerMessaging(message_q, scheduler)
 
         funcs += [
             RepeatingFunc('scheduler-lock-%s' % region, schedule.lock,
                           lock_interval),
             RepeatingFunc('scheduler-%s' % region, schedule.loop,
                           loop_interval),
+            RepeatingFunc('scheduler-message-%s' % region, messaging.receive,
+                          21),
             RepeatingFunc('provisioner-%s' % region, provisioner.provision,
                           provision_interval)
         ]
