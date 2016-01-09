@@ -83,11 +83,6 @@
       "Type": "String",
       "Description": "DNS TLD"
     },
-    "DynamoDbRegion": {
-      "Type": "String",
-      "Default": "us-east-1",
-      "Description": "DynamoDB region"
-    },
     "KmsKey": {
       "Type": "String",
       "Default": "",
@@ -205,7 +200,7 @@
                       "Fn::Join": [
                         "", [
                           "arn:aws:dynamodb:",
-                          {"Ref": "DynamoDbRegion"},
+                          {"Ref": "AWS::Region"},
                           ":",
                           {"Ref": "AWS::AccountId"},
                           ":table/flotilla-",
@@ -228,7 +223,7 @@
                     "Fn::Join": [
                       "", [
                         "arn:aws:dynamodb:",
-                        {"Ref": "DynamoDbRegion"},
+                        {"Ref": "AWS::Region"},
                         ":",
                         {"Ref": "AWS::AccountId"},
                         ":table/flotilla-",
@@ -249,7 +244,7 @@
                       "Fn::Join": [
                         "", [
                           "arn:aws:dynamodb:",
-                          {"Ref": "DynamoDbRegion"},
+                          {"Ref": "AWS::Region"},
                           ":",
                           {"Ref": "AWS::AccountId"},
                           ":table/flotilla-",
@@ -270,7 +265,7 @@
                       "Fn::Join": [
                         "", [
                           "arn:aws:dynamodb:",
-                          {"Ref": "DynamoDbRegion"},
+                          {"Ref": "AWS::Region"},
                           ":",
                           {"Ref": "AWS::AccountId"},
                           ":table/flotilla-",
@@ -283,7 +278,7 @@
                       "Fn::Join": [
                         "", [
                           "arn:aws:dynamodb:",
-                          {"Ref": "DynamoDbRegion"},
+                          {"Ref": "AWS::Region"},
                           ":",
                           {"Ref": "AWS::AccountId"},
                           ":table/flotilla-",
@@ -303,7 +298,7 @@
                     "Fn::Join": [
                       "", [
                         "arn:aws:dynamodb:",
-                        {"Ref": "DynamoDbRegion"},
+                        {"Ref": "AWS::Region"},
                         ":",
                         {"Ref": "AWS::AccountId"},
                         ":table/flotilla-",
@@ -365,7 +360,7 @@
                         "Fn::Join": [
                           "", [
                             "arn:aws:kms:",
-                            {"Ref": "DynamoDbRegion"},
+                            {"Ref": "AWS::Region"},
                             ":",
                             {"Ref": "AWS::AccountId"},
                             ":key/",
@@ -437,11 +432,11 @@
                 " -e FLOTILLA_ENV=", {"Ref": "FlotillaEnvironment"},
                 " -e FLOTILLA_SERVICE=", {"Ref": "ServiceName"},
                 " -e FLOTILLA_LB=", {"Ref": "Elb"},
-                " -e FLOTILLA_LB_REGION=", {"Ref": "AWS::Region"},
+                " -e FLOTILLA_REGION=", {"Ref": "AWS::Region"},
                 " -v /run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket",
                 " -v /etc/systemd/system:/etc/systemd/system",
                 " -v /etc/flotilla:/etc/flotilla",
-                " pwagner/flotilla", "\n",
+                " pwagner/flotilla agent", "\n",
                 "        ExecStop=/usr/bin/docker stop flotilla", "\n",
                 "\n",
                 "users:", "\n",

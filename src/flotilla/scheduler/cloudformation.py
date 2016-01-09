@@ -1,9 +1,11 @@
 import hashlib
 import json
 import logging
+import time
 import boto.cloudformation
 from boto.cloudformation.stack import Stack
 from boto.exception import BotoServerError
+from copy import deepcopy
 
 logger = logging.getLogger('flotilla')
 
@@ -27,9 +29,11 @@ SERVICE_KEYS_ITERABLE = ('private_ports',
                          'regions')
 
 FORWARD_FIELDS = ['VpcId', 'NatSecurityGroup']
-for i in range(1, 4):
-    FORWARD_FIELDS.append('PublicSubnet0%d' % i)
-    FORWARD_FIELDS.append('PrivateSubnet0%d' % i)
+for subnet_index in range(1, 4):
+    FORWARD_FIELDS.append('PublicSubnet0%d' % subnet_index)
+    FORWARD_FIELDS.append('PrivateSubnet0%d' % subnet_index)
+
+CAPABILITIES = ('CAPABILITY_IAM',)
 
 
 def sha256(val, params={}):
@@ -42,17 +46,23 @@ def sha256(val, params={}):
 
 
 class FlotillaCloudFormation(object):
-    def __init__(self, environment, domain, coreos):
+    def __init__(self, environment, domain, coreos, backoff=2.0):
         self._clients = {}
         self._environment = environment
         self._domain = domain
         self._coreos = coreos
-        # FIXME: input as param
-        self._db_region = 'us-east-1'
-        with open('cloudformation/vpc.template') as template_in:
-            self._vpc = template_in.read()
-        with open('cloudformation/service-elb.template') as template_in:
-            self._service_elb = template_in.read()
+        self._backoff = backoff
+        self._templates = {}
+
+    def _template(self, template):
+        cached = self._templates.get(template)
+        if cached:
+            return cached
+
+        with open('cloudformation/%s.template' % template) as template_in:
+            loaded = template_in.read()
+            self._templates[template] = loaded
+            return loaded
 
     def vpc(self, region, params=None):
         """
@@ -62,7 +72,7 @@ class FlotillaCloudFormation(object):
         :return: CloudFormation Stack.
         """
         name = 'flotilla-{0}-vpc'.format(self._environment)
-        return self._stack(region, name, self._vpc, params)
+        return self._stack(region, name, self._template('vpc'), params)
 
     def _vpc_params(self, region_name, region):
         nat_coreos_channel = region.get('nat_coreos_channel', 'stable')
@@ -94,7 +104,7 @@ class FlotillaCloudFormation(object):
         name = 'flotilla-{0}-{1}'.format(self._environment,
                                          service['service_name'])
         service_params = self._service_params(region, service, vpc_outputs)
-        json_template = json.loads(self._service_elb)
+        json_template = json.loads(self._template('service-elb'))
         resources = json_template['Resources']
 
         # Public ports are exposed to ELB, as a listener by ELB:
@@ -160,7 +170,6 @@ class FlotillaCloudFormation(object):
         service_name = service['service_name']
         params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
         params['FlotillaEnvironment'] = self._environment
-        params['DynamoDbRegion'] = self._db_region
         params['ServiceName'] = service_name
         # FIXME: HA by default, don't be cheap
         params['InstanceType'] = service.get('instance_type', 't2.nano')
@@ -188,6 +197,102 @@ class FlotillaCloudFormation(object):
         params['Ami'] = ami
         return params
 
+    def tables(self, regions):
+        """
+        Create table for stack in every hosted region.
+        :param regions: Regions.
+        """
+        name = 'flotilla-{0}-tables'.format(self._environment)
+        params = {
+            'FlotillaEnvironment': self._environment
+        }
+
+        # Create/update stack in each region:
+        table_stacks = {
+            region: self._stack(region, name, self._template('tables'), params)
+            for region in regions}
+
+        self._wait_for_stacks(table_stacks)
+        logger.debug('Finished creating tables in %s', regions)
+
+    def _wait_for_stacks(self, stacks):
+        done = False
+        while not done:
+            done = True
+            for region, stack in stacks.items():
+                if stack.stack_status not in DONE_STATES:
+                    done = False
+                    logger.info('Waiting for stack in %s', region)
+
+                    client = self._client(region)
+                    stacks[region] = client.describe_stacks(stack.stack_id)[0]
+            if not done:
+                time.sleep(self._backoff)
+
+    def schedulers(self, region_params):
+        """
+        Create scheduler stack in each region.
+        :param region_params: Map of region_name -> parameter map.
+        """
+        name = 'flotilla-{0}-scheduler'.format(self._environment)
+        base_params = {
+            'FlotillaEnvironment': self._environment
+        }
+
+        # If there are regions without a local scheduler, hack IAM Role
+        template = self._template('scheduler')
+        for params in region_params.values():
+            if not params.get('scheduler'):
+                regions = region_params.keys()
+                template = self._scheduler_for_regions(regions)
+                base_params['FlotillaRegion'] = ' '.join(regions)
+                break
+
+        # Create scheduler stacks:
+        scheduler_stacks = {}
+        for region, params in region_params.items():
+            if not params.get('scheduler'):
+                continue
+
+            scheduler_params = base_params.copy()
+            scheduler_params['InstanceType'] = params['scheduler_instance_type']
+            scheduler_params['Ami'] = self._coreos.get_ami(
+                    params['scheduler_coreos_channel'],
+                    params['scheduler_coreos_version'],
+                    region)
+            for i in range(1, 4):
+                scheduler_params['Az%d' % i] = params['az%d' % i]
+
+            if 'FlotillaRegion' not in scheduler_params:
+                scheduler_params['FlotillaRegion'] = region
+
+            scheduler_stacks[region] = self._stack(region, name, template,
+                                                   scheduler_params)
+        self._wait_for_stacks(scheduler_stacks)
+
+    def _scheduler_for_regions(self, regions):
+        """
+        Doctor scheduler template for operating in multiple regions.
+        :param regions: Region list.
+        :return: Customized template.
+        """
+        template_json = json.loads(self._template('scheduler'))
+        resources = template_json['Resources']
+        for role_policy in resources['Role']['Properties']['Policies']:
+            if role_policy['PolicyName'] != 'FlotillaDynamo':
+                continue
+
+            dynamo_statements = role_policy['PolicyDocument']['Statement']
+            for dynamo_statement in dynamo_statements:
+                # Replace "this region" reference with every managed region:
+                new_resources = []
+                for region in regions:
+                    region_resource = deepcopy(dynamo_statement['Resource'])
+                    region_resource['Fn::Join'][1][1] = region
+                    new_resources.append(region_resource)
+                dynamo_statement['Resource'] = new_resources
+        return json.dumps(template_json)
+
     def _stack(self, region, name, template, params):
         """
         Create/update CloudFormation stack if possible.
@@ -201,7 +306,7 @@ class FlotillaCloudFormation(object):
         client = self._client(region)
 
         try:
-            logger.debug('Describing stack %s...', name)
+            logger.debug('Describing stack %s in %s...', name, region)
             existing = client.describe_stacks(name)[0]
         except BotoServerError:
             existing = None
@@ -214,10 +319,10 @@ class FlotillaCloudFormation(object):
             # Attempt update:
             try:
                 stack_id = client.update_stack(name,
-                                               capabilities=['CAPABILITY_IAM'],
+                                               capabilities=CAPABILITIES,
                                                template_body=template,
                                                parameters=params)
-                logger.debug('Updated stack %s', name)
+                logger.debug('Updated stack %s in %s', name, region)
                 stack = Stack()
                 stack.stack_id = stack_id
                 return stack
@@ -226,9 +331,9 @@ class FlotillaCloudFormation(object):
                     return existing
                 raise e
         else:  # not existing
-            logger.debug('Created stack %s', name)
+            logger.debug('Creating stack %s in %s', name, region)
             stack_id = client.create_stack(name,
-                                           capabilities=['CAPABILITY_IAM'],
+                                           capabilities=CAPABILITIES,
                                            template_body=template,
                                            parameters=params)
             stack = Stack()
@@ -241,7 +346,7 @@ class FlotillaCloudFormation(object):
         :param params: VPC parameters
         :return: Hash.
         """
-        return sha256(self._vpc, params)
+        return sha256(self._template('vpc'), params)
 
     def service_hash(self, service, vpc_outputs):
         """
@@ -261,7 +366,7 @@ class FlotillaCloudFormation(object):
             value = service.get(key)
             if value:
                 params[key] = value
-        return sha256(self._service_elb, params)
+        return sha256(self._template('service-elb'), params)
 
     def _client(self, region):
         client = self._clients.get(region)
