@@ -45,6 +45,11 @@ def service(environment, region, name, elb_scheme, dns_name, health_check,
             instance_type, provision, public_ports,
             private_ports):  # pragma: no cover
     setup_logging()
+
+    if not name:
+        logger.warn('Service not specified')
+        return
+
     updates = get_updates(elb_scheme, dns_name, health_check, instance_type,
                           provision, public_ports, private_ports)
 
