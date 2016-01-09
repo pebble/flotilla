@@ -1,11 +1,9 @@
 import unittest
-from mock import MagicMock, ANY, patch
+from mock import MagicMock, ANY
 import time
 from flotilla.scheduler.db import FlotillaSchedulerDynamo, INSTANCE_EXPIRY
-from boto.exception import BotoServerError
 from boto.dynamodb2.table import Table, BatchTable
-from boto.vpc import VPCConnection
-from boto.vpc.vpc import VPC
+from boto.dynamodb2.exceptions import ItemNotFound
 
 SERVICE = 'test'
 INSTANCE_ID = 'i-123456'
@@ -25,11 +23,11 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
                                           self.services, self.stacks,
                                           self.status)
 
-    def test_get_revision_weights_empty(self):
-        weights = self.db.get_revision_weights()
+    def test_get_all_revision_weights_empty(self):
+        weights = self.db.get_all_revision_weights()
         self.assertEqual(0, len(weights))
 
-    def test_get_revision_weights(self):
+    def test_get_all_revision_weights(self):
         rev2 = REVISION.replace('a', 'b')
         rev3 = REVISION.replace('a', 'c')
         rev4 = REVISION.replace('a', 'd')
@@ -47,7 +45,7 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
             }
         ]
 
-        weights = self.db.get_revision_weights()
+        weights = self.db.get_all_revision_weights()
         self.assertEqual(2, len(weights))
 
         service_test = weights[SERVICE]
@@ -57,6 +55,23 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         service_test = weights['test2']
         self.assertEqual(1, service_test[rev3])
         self.assertEqual(2, service_test[rev4])
+
+    def test_get_service_revisions(self):
+        self.services.get_item.return_value = {
+            'service_name': SERVICE,
+            'regions': ['us-east-1'],
+            REVISION: 1
+        }
+
+        weights = self.db.get_revision_weights(SERVICE)
+        self.assertEqual(1, len(weights))
+        self.assertEqual(1, weights[REVISION])
+
+    def test_get_service_revisions_not_found(self):
+        self.services.get_item.side_effect = ItemNotFound()
+
+        weights = self.db.get_revision_weights(SERVICE)
+        self.assertEqual(0, len(weights))
 
     def test_set_assignment(self):
         self.db.set_assignment(SERVICE, INSTANCE_ID, REVISION)

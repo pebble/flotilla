@@ -22,7 +22,7 @@ class TestFlotillaScheduler(unittest.TestCase):
     def test_loop_not_active(self):
         self.scheduler.active = False
         self.scheduler.loop()
-        self.db.get_revision_weights.assert_not_called()
+        self.db.get_all_revision_weights.assert_not_called()
         self.db.get_instance_assignments.assert_not_called()
 
     def test_loop_no_services(self):
@@ -30,20 +30,20 @@ class TestFlotillaScheduler(unittest.TestCase):
         self.db.get_instance_assignments.assert_not_called()
 
     def test_loop_service_without_revisions(self):
-        self.db.get_revision_weights.return_value = {
+        self.db.get_all_revision_weights.return_value = {
             SERVICE: {}
         }
         self.scheduler.loop()
 
     def test_loop_assignments_no_instances(self):
-        self.db.get_revision_weights.return_value = {SERVICE: {REVISION: 1}}
+        self.db.get_all_revision_weights.return_value = {SERVICE: {REVISION: 1}}
 
         self.scheduler.loop()
 
         self.db.set_assignments.assert_not_called()
 
     def test_loop_assignments(self):
-        self.db.get_revision_weights.return_value = {SERVICE: {REVISION: 1}}
+        self.db.get_all_revision_weights.return_value = {SERVICE: {REVISION: 1}}
         assignment = MagicMock(spec=Item)
         self.db.get_instance_assignments.return_value[None].append(assignment)
 
@@ -52,7 +52,7 @@ class TestFlotillaScheduler(unittest.TestCase):
         self.db.set_assignments.assert_called_with(ANY)
 
     def test_loop_assignments_reassign(self):
-        self.db.get_revision_weights.return_value = {SERVICE: {REVISION: 1}}
+        self.db.get_all_revision_weights.return_value = {SERVICE: {REVISION: 1}}
         assignment = MagicMock(spec=Item)
         self.db.get_instance_assignments.return_value[None]
         self.db.get_instance_assignments.return_value[REVISION2].append(
@@ -63,7 +63,7 @@ class TestFlotillaScheduler(unittest.TestCase):
         self.db.set_assignments.assert_called_with(ANY)
 
     def test_loop_assignments_reassign_partial(self):
-        self.db.get_revision_weights.return_value = {
+        self.db.get_all_revision_weights.return_value = {
             SERVICE: {REVISION: 1, REVISION2: 1}}
         assignment = MagicMock(spec=Item)
         self.db.get_instance_assignments.return_value[None]

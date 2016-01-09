@@ -17,7 +17,7 @@ class FlotillaScheduler(object):
             return
 
         with self.__loop:
-            service_weights = self._db.get_revision_weights()
+            service_weights = self._db.get_all_revision_weights()
             for service, revisions in service_weights.items():
                 logger.debug('Balancing assignments: %s (%s revisions).',
                              service, len(revisions))
