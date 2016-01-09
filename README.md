@@ -10,6 +10,8 @@ Flotilla uses:
 * ELB - to reroute traffic during an upgrade
 * IAM - for access control
 * KMS - for encryption of environment variables
+* CloudFormation - for provisioning resources
+* SQS - for communication between components
 
 Like fleet, flotilla distributes [systemd units](http://www.freedesktop.org/software/systemd/man/systemd.unit.html) across a cluster of machines.
 

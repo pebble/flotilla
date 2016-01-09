@@ -57,6 +57,9 @@ class FlotillaSchedulerDynamo(object):
         return [s for s in self._stacks.scan()]
 
     def set_stacks(self, stacks):
+        if not stacks:
+            return
+
         with self._stacks.batch_write() as batch:
             for stack in stacks:
                 batch.put_item(stack)
@@ -123,10 +126,6 @@ class FlotillaSchedulerDynamo(object):
 
         return assignments
 
-    def get_region_params(self, regions):
-        keys = [{'region_name': region} for region in regions]
-        region_params = {}
-        for item in self._regions.batch_get(keys):
-            region_params[item['region_name']] = dict(item)
-
-        return region_params
+    def get_region_params(self, region):
+        region_item = self._regions.get_item(region_name=region)
+        return dict(region_item)

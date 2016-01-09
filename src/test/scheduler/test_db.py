@@ -138,10 +138,13 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.db.set_stacks([{'stack_arn': 'foo'}])
         self.stacks.batch_write.assert_called_with()
 
-    def test_get_region_params(self):
-        self.regions.batch_get.return_value = [
-            {'region_name': 'us-east-1', 'az1': 'us-east-1e'}
-        ]
+    def test_set_stacks_empty(self):
+        self.db.set_stacks([])
+        self.stacks.batch_write.assert_not_called()
 
-        region_params = self.db.get_region_params(['us-east-1'])
-        self.assertEqual(len(region_params), 1)
+    def test_get_region_params(self):
+        self.regions.get_item.return_value = {'region_name': 'us-east-1',
+                                              'az1': 'us-east-1e'}
+
+        region_params = self.db.get_region_params('us-east-1')
+        self.assertEqual(region_params['az1'], 'us-east-1e')

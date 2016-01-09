@@ -65,7 +65,7 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
 
         # Assemble into scheduler:
         schedule = FlotillaScheduler(db, locks, lock_ttl=lock_interval * 3)
-        provisioner = FlotillaProvisioner(environment, schedule, db,
+        provisioner = FlotillaProvisioner(environment, region, schedule, db,
                                           cloudformation)
 
         funcs += [

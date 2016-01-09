@@ -35,25 +35,29 @@ def service_cmd():  # pragma: no cover
               help='ELB health check target, http://goo.gl/6ue44c .')
 @click.option('--instance-type', type=click.Choice(INSTANCE_TYPES),
               help='Worker instance type.')
+@click.option('--provision/--no-provision', default=None,
+              help='Disable automatic provisioning.')
 @click.option('--public-ports', type=click.STRING, multiple=True,
               help='Public ports, exposed by ELB. e.g. 80-http, 6379-tcp', )
 @click.option('--private-ports', type=click.STRING, multiple=True,
               help='Private ports, exposed to peers. e.g. 9300-tcp, 9200-tcp')
 def service(environment, region, name, elb_scheme, dns_name, health_check,
-            instance_type, public_ports, private_ports):  # pragma: no cover
+            instance_type, provision, public_ports,
+            private_ports):  # pragma: no cover
     setup_logging()
     updates = get_updates(elb_scheme, dns_name, health_check, instance_type,
-                          public_ports, private_ports)
+                          provision, public_ports, private_ports)
 
     if not updates:
         logger.warn('No updates to do!')
         return
 
     configure_service(environment, region, name, updates)
+    logger.info('Service %s updated in: %s', name, ', '.join(region))
 
 
-def get_updates(elb_scheme, dns, health_check, instance_type, public_ports,
-                private_ports):
+def get_updates(elb_scheme, dns, health_check, instance_type, provision,
+                public_ports, private_ports):
     updates = {}
     if elb_scheme:
         updates['elb_scheme'] = elb_scheme
@@ -63,6 +67,8 @@ def get_updates(elb_scheme, dns, health_check, instance_type, public_ports,
         updates['health_check'] = health_check
     if instance_type:
         updates['instance_type'] = instance_type
+    if provision is not None:
+        updates['provision'] = provision
     if public_ports:
         parsed_ports = {}
         for public_port in public_ports:

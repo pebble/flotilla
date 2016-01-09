@@ -14,6 +14,7 @@ REGION = 'us-east-1'
 REGIONS = (REGION, 'us-west-2')
 STACK_ARN = 'stack_arn'
 TEMPLATE = '{}'
+SERVICE_STACK = 'flotilla-test-worker-service'
 
 
 class TestFlotillaCloudFormation(unittest.TestCase):
@@ -40,33 +41,29 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.assertEqual(self.cloudformation, self.cf._clients[REGION])
 
     def test_service_hash(self):
-        service_hash = self.cf.service_hash(self.service, {'foo': 'bar'})
+        service_hash = self.cf._service_hash(self.service, {'foo': 'bar'})
         self.assertIsNotNone(service_hash)
 
     def test_service_hash_string_fields(self):
-        hash_base = self.cf.service_hash(self.service, {'foo': 'bar'})
+        hash_base = self.cf._service_hash(self.service, {'foo': 'bar'})
 
         self.service['instance_type'] = 't2.micro'
-        hash_with_string = self.cf.service_hash(self.service, {'foo': 'bar'})
+        hash_with_string = self.cf._service_hash(self.service, {'foo': 'bar'})
 
         self.assertNotEqual(hash_base, hash_with_string)
 
     def test_service_hash_iterable_fields(self):
-        hash_base = self.cf.service_hash(self.service, {'foo': 'bar'})
+        hash_base = self.cf._service_hash(self.service, {'foo': 'bar'})
 
         self.service['regions'] = ['us-east-1', 'us-west-2']
-        hash_with_list = self.cf.service_hash(self.service, {'foo': 'bar'})
+        hash_with_list = self.cf._service_hash(self.service, {'foo': 'bar'})
         self.assertNotEqual(hash_base, hash_with_list)
 
         self.service['regions'] = ['us-west-2', 'us-east-1']
-        hash_with_list_order = self.cf.service_hash(self.service,
-                                                    {'foo': 'bar'})
+        hash_with_list_order = self.cf._service_hash(self.service,
+                                                     {'foo': 'bar'})
         self.assertNotEqual(hash_base, hash_with_list_order)
         self.assertEqual(hash_with_list, hash_with_list_order)
-
-    def test_vpc_hash(self):
-        vpc_hash = self.cf.vpc_hash({'foo': 'bar'})
-        self.assertIsNotNone(vpc_hash)
 
     def test_stack_does_not_exists(self):
         self.mock_client()
@@ -130,28 +127,30 @@ class TestFlotillaCloudFormation(unittest.TestCase):
     def test_service(self):
         self.cf._stack = MagicMock()
 
-        self.cf.service(REGION, self.service, {})
+        self.cf.service(REGION, self.service, {}, None)
 
-        self.cf._stack.assert_called_with(REGION, 'flotilla-test-service',
-                                          ANY, ANY)
+        self.cf._stack.assert_called_with(REGION, SERVICE_STACK, ANY, ANY)
+
+    def test_service_complete(self):
+        self.cf._complete = MagicMock(return_value=True)
+        service = self.cf.service(REGION, self.service, {}, None)
+        self.assertIsNone(service)
 
     def test_service_public_ports(self):
         self.cf._stack = MagicMock()
         self.service['public_ports'] = {'9200': 'HTTP'}
 
-        self.cf.service(REGION, self.service, {})
+        self.cf.service(REGION, self.service, {}, None)
 
-        self.cf._stack.assert_called_with(REGION, 'flotilla-test-service',
-                                          ANY, ANY)
+        self.cf._stack.assert_called_with(REGION, SERVICE_STACK, ANY, ANY)
 
     def test_service_private_ports(self):
         self.cf._stack = MagicMock()
         self.service['private_ports'] = {'9300': ['TCP']}
 
-        self.cf.service(REGION, self.service, {})
+        self.cf.service(REGION, self.service, {}, None)
 
-        self.cf._stack.assert_called_with(REGION, 'flotilla-test-service',
-                                          ANY, ANY)
+        self.cf._stack.assert_called_with(REGION, SERVICE_STACK, ANY, ANY)
 
     def test_service_params_generate_dns(self):
         stack_params = self.cf._service_params(REGION, self.service, {})
@@ -168,13 +167,18 @@ class TestFlotillaCloudFormation(unittest.TestCase):
     def test_vpc(self):
         self.cf._stack = MagicMock()
 
-        self.cf.vpc(REGION, {})
+        self.cf.vpc({'region_name': REGION}, None)
 
         self.cf._stack.assert_called_with(REGION, 'flotilla-test-vpc',
-                                          self.cf._template('vpc'), {})
+                                          self.cf._template('vpc'), ANY)
+
+    def test_vpc_complete(self):
+        self.cf._complete = MagicMock(return_value=True)
+        vpc = self.cf.vpc({'region_name': REGION}, None)
+        self.assertIsNone(vpc)
 
     def test_vpc_params_empty(self):
-        params = self.cf._vpc_params(REGION, {})
+        params = self.cf._vpc_params({'region_name': REGION})
         self.assertEqual(params['Az1'], 'us-east-1a')
         self.assertEqual(params['Az2'], 'us-east-1b')
         self.assertEqual(params['Az3'], 'us-east-1c')
@@ -244,6 +248,21 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf._scheduler_for_regions.assert_called_with(ANY)
         self.cf._stack.assert_called_with(REGION, 'flotilla-test-scheduler',
                                           ANY, ANY)
+
+    def test_complete_missing(self):
+        self.assertFalse(self.cf._complete(None, 'foo'))
+
+    def test_complete_hash_mismatch(self):
+        stack = {'stack_hash': 'bar'}
+        self.assertFalse(self.cf._complete(stack, 'foo'))
+
+    def test_complete_no_outputs(self):
+        stack = {'stack_hash': 'foo'}
+        self.assertFalse(self.cf._complete(stack, 'foo'))
+
+    def test_complete(self):
+        stack = {'stack_hash': 'foo', 'outputs': {'foo': 'bar'}}
+        self.assertTrue(self.cf._complete(stack, 'foo'))
 
     def mock_client(self):
         self.cf._client = MagicMock(return_value=self.cloudformation)

@@ -16,8 +16,9 @@ class TestFlotillaProvisioner(unittest.TestCase):
         self.scheduler.active = True
         self.db = MagicMock(spec=FlotillaSchedulerDynamo)
         self.cloudformation = MagicMock(spec=FlotillaCloudFormation)
-        self.provisioner = FlotillaProvisioner(ENVIRONMENT, self.scheduler,
-                                               self.db, self.cloudformation)
+        self.provisioner = FlotillaProvisioner(ENVIRONMENT, REGION,
+                                               self.scheduler, self.db,
+                                               self.cloudformation)
 
     def test_provision_not_active(self):
         self.scheduler.active = False
@@ -28,7 +29,7 @@ class TestFlotillaProvisioner(unittest.TestCase):
 
     def test_provision_no_regions(self):
         self.db.services.return_value = [
-            {'service_name': SERVICE}
+            {'service_name': SERVICE, 'provision': False}
         ]
 
         self.provisioner.provision()
@@ -39,11 +40,12 @@ class TestFlotillaProvisioner(unittest.TestCase):
 
     def test_provision_no_region_vpc(self):
         self.mock_service()
+        self.cloudformation.vpc.return_value = {}
 
         self.provisioner.provision()
 
         # VPC is created, service is not:
-        self.cloudformation.vpc.assert_called_with(REGION, ANY)
+        self.cloudformation.vpc.assert_called_with(ANY, None)
         self.cloudformation.service.assert_not_called()
         self.db.set_stacks.assert_called_with(ANY)
 
@@ -54,14 +56,13 @@ class TestFlotillaProvisioner(unittest.TestCase):
             {'region': REGION,
              'outputs': vpc_outputs}
         ]
-        self.provisioner._complete = MagicMock()
-        self.provisioner._complete.side_effect = [True, False]
+        self.cloudformation._complete = MagicMock(side_effect=[True, False])
 
         self.provisioner.provision()
 
-        self.cloudformation.vpc.assert_not_called()
+        self.cloudformation.vpc.assert_called_with(ANY, ANY)
         self.cloudformation.service.assert_called_with(REGION, self.service,
-                                                       vpc_outputs)
+                                                       ANY, ANY)
         self.db.set_stacks.assert_called_with(ANY)
 
     def test_provision_existing(self):
@@ -73,13 +74,14 @@ class TestFlotillaProvisioner(unittest.TestCase):
              'service': SERVICE,
              'outputs': {'foo': 'bar'}}
         ]
-        self.provisioner._complete = MagicMock(return_value=True)
+        self.cloudformation.vpc.return_value = None
+        self.cloudformation.service.return_value = None
 
         self.provisioner.provision()
 
-        self.cloudformation.vpc.assert_not_called()
-        self.cloudformation.service.assert_not_called()
-        self.db.set_stacks.assert_not_called()
+        self.cloudformation.vpc.assert_called_with(ANY, ANY)
+        self.cloudformation.service.assert_called_with(REGION, ANY, ANY, ANY)
+        self.db.set_stacks.assert_called_with([])
 
     def test_provision_delete(self):
         self.db.services.return_value = [
@@ -95,21 +97,6 @@ class TestFlotillaProvisioner(unittest.TestCase):
         self.provisioner.provision()
         # FIXME: test when delete implemented
 
-    def test_complete_missing(self):
-        self.assertFalse(self.provisioner._complete(None, 'foo'))
-
-    def test_complete_hash_mismatch(self):
-        stack = {'stack_hash': 'bar'}
-        self.assertFalse(self.provisioner._complete(stack, 'foo'))
-
-    def test_complete_no_outputs(self):
-        stack = {'stack_hash': 'foo'}
-        self.assertFalse(self.provisioner._complete(stack, 'foo'))
-
-    def test_complete(self):
-        stack = {'stack_hash': 'foo', 'outputs': {'foo': 'bar'}}
-        self.assertTrue(self.provisioner._complete(stack, 'foo'))
-
     def mock_service(self):
-        self.service = {'service_name': SERVICE, 'regions': [REGION]}
+        self.service = {'service_name': SERVICE, 'provision': 1}
         self.db.services.return_value = [self.service]
