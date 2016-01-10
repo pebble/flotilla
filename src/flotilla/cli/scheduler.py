@@ -3,8 +3,8 @@ import logging
 import boto.dynamodb2
 import boto.sqs
 
-from main import get_instance_id, setup_logging, REGIONS, DEFAULT_REGIONS, \
-    DEFAULT_ENVIRONMENT
+from main import get_instance_id, setup_logging
+from flotilla.cli.options import *
 from flotilla.db import DynamoDbTables, DynamoDbLocks
 from flotilla.scheduler import *
 from flotilla.thread import RepeatingFunc

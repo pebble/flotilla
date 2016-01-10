@@ -1,21 +1,13 @@
 import click
 import logging
 from more_itertools import unique_everseen
-from main import setup_logging, INSTANCE_TYPES, REGIONS, DEFAULT_REGIONS, \
-    DEFAULT_ENVIRONMENT
 
+from main import setup_logging
+from flotilla.cli.options import *
 from flotilla.client import RegionMetadata
 from flotilla.scheduler import CoreOsAmiIndex, FlotillaCloudFormation
 
 logger = logging.getLogger('flotilla')
-
-CHANNELS = ('stable',
-            'beta',
-            'alpha')
-
-DEFAULT_INSTANCE_TYPE = 't2.nano'
-DEFAULT_CHANNEL = 'stable'
-DEFAULT_VERSION = 'current'
 
 
 @click.group()
@@ -33,7 +25,7 @@ def init_cmd():  # pragma: no cover
 @click.option('--instance-type', type=click.Choice(INSTANCE_TYPES),
               envvar='FLOTILLA_SCHEDULER_TYPE', default=DEFAULT_INSTANCE_TYPE,
               help='Scheduler instance type.')
-@click.option('--coreos-channel', type=click.Choice(CHANNELS),
+@click.option('--coreos-channel', type=click.Choice(COREOS_CHANNELS),
               envvar='FLOTILLA_SCHEDULER_CHANNEL', default=DEFAULT_CHANNEL,
               help='Scheduler CoreOS channel.')
 @click.option('--coreos-version', type=click.STRING,

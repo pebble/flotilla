@@ -5,8 +5,8 @@ import boto.kms
 
 from collections import defaultdict
 
-from main import setup_logging, REGIONS, INSTANCE_TYPES, DEFAULT_REGIONS, \
-    DEFAULT_ENVIRONMENT
+from main import setup_logging
+from flotilla.cli.options import *
 from flotilla.db import DynamoDbTables
 from flotilla.client import FlotillaClientDynamo
 

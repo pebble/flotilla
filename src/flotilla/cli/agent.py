@@ -4,7 +4,8 @@ import boto.kms
 import click
 import logging
 
-from main import get_instance_id, setup_logging, REGIONS
+from main import get_instance_id, setup_logging
+from flotilla.cli.options import REGIONS
 from flotilla.agent import FlotillaAgent, FlotillaAgentDynamo, LoadBalancer, \
     SystemdUnits
 from flotilla.db import DynamoDbTables, DynamoDbLocks
