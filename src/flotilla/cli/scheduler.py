@@ -3,7 +3,7 @@ import logging
 import boto.dynamodb2
 import boto.sqs
 
-from main import get_instance_id, setup_logging
+from main import get_instance_id
 from flotilla.cli.options import *
 from flotilla.db import DynamoDbTables, DynamoDbLocks
 from flotilla.scheduler import *
@@ -35,7 +35,6 @@ def scheduler_cmd():  # pragma: no cover
               help='Frequency of provision loop (seconds).')
 def scheduler(environment, domain, region, lock_interval, loop_interval,
               provision_interval):  # pragma: no cover
-    setup_logging()
     start_scheduler(environment, domain, region, lock_interval, loop_interval,
                     provision_interval)
 

@@ -5,7 +5,6 @@ import boto.kms
 
 from collections import defaultdict
 
-from main import setup_logging
 from flotilla.cli.options import *
 from flotilla.db import DynamoDbTables
 from flotilla.client import FlotillaClientDynamo
@@ -55,8 +54,6 @@ def service(environment, region, name, elb_scheme, dns_name, health_check,
             instance_type, provision, instance_min, instance_max, kms_key,
             coreos_channel, coreos_version, public_ports,
             private_ports):  # pragma: no cover
-    setup_logging()
-
     if not name:
         logger.warn('Service not specified')
         return

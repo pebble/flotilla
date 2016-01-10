@@ -2,7 +2,6 @@ import click
 import logging
 from more_itertools import unique_everseen
 
-from main import setup_logging
 from flotilla.cli.options import *
 from flotilla.client import RegionMetadata
 from flotilla.scheduler import CoreOsAmiIndex, FlotillaCloudFormation
@@ -35,7 +34,6 @@ def init_cmd():  # pragma: no cover
               help='Launch scheduler in every region (or just the first).')
 def init(region, environment, domain, instance_type, coreos_channel,
          coreos_version, available):  # pragma: no cover
-    setup_logging()
     bootstrap(region, environment, domain, instance_type, coreos_channel,
               coreos_version, available)
 

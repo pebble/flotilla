@@ -4,7 +4,7 @@ import boto.kms
 import click
 import logging
 
-from main import get_instance_id, setup_logging
+from main import get_instance_id
 from flotilla.cli.options import REGIONS
 from flotilla.agent import FlotillaAgent, FlotillaAgentDynamo, LoadBalancer, \
     SystemdUnits
@@ -43,7 +43,6 @@ def agent_cmd():  # pragma: no cover
               help='Frequency of assignment reads (seconds).')
 def agent(service, environment, region, elb, health_interval,
           assignment_interval):  # pragma: no cover
-    setup_logging()
     start_agent(environment, service, region, elb, health_interval,
                 assignment_interval)
 

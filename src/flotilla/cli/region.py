@@ -2,7 +2,6 @@ import click
 import logging
 import boto.dynamodb2
 
-from main import setup_logging
 from flotilla.cli.options import *
 from flotilla.db import DynamoDbTables
 from flotilla.client import FlotillaClientDynamo
@@ -29,8 +28,6 @@ def region_cmd():  # pragma: no cover
               help='NAT instance CoreOS version.')
 def region(environment, region, nat_instance_type, nat_coreos_channel,
            nat_coreos_version):  # pragma: no cover
-    setup_logging()
-
     if not region:
         logger.warn('Must specify region(s) to update.')
         return
