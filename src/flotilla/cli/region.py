@@ -24,10 +24,8 @@ def region_cmd():  # pragma: no cover
 @click.option('--nat-instance-type', type=click.Choice(INSTANCE_TYPES),
               help='NAT instance type.')
 @click.option('--nat-coreos-channel', type=click.Choice(COREOS_CHANNELS),
-              envvar='FLOTILLA_NAT_CHANNEL',
               help='NAT instance CoreOS channel.')
 @click.option('--nat-coreos-version', type=click.STRING,
-              envvar='FLOTILLA_NAT_VERSION',
               help='NAT instance CoreOS version.')
 def region(environment, region, nat_instance_type, nat_coreos_channel,
            nat_coreos_version):  # pragma: no cover

@@ -37,12 +37,23 @@ def service_cmd():  # pragma: no cover
               help='Worker instance type.')
 @click.option('--provision/--no-provision', default=None,
               help='Disable automatic provisioning.')
+@click.option('--instance-min', type=click.INT,
+              help='Minimum worker count.')
+@click.option('--instance-max', type=click.INT,
+              help='Maximum worker count.')
+@click.option('--kms-key', type=click.STRING,
+              help='KMS key for encrypting environment variables.')
+@click.option('--coreos-channel', type=click.Choice(COREOS_CHANNELS),
+              help='Worker CoreOS channel.')
+@click.option('--coreos-version', type=click.STRING,
+              help='Worker CoreOS version.')
 @click.option('--public-ports', type=click.STRING, multiple=True,
               help='Public ports, exposed by ELB. e.g. 80-http, 6379-tcp', )
 @click.option('--private-ports', type=click.STRING, multiple=True,
               help='Private ports, exposed to peers. e.g. 9300-tcp, 9200-tcp')
 def service(environment, region, name, elb_scheme, dns_name, health_check,
-            instance_type, provision, public_ports,
+            instance_type, provision, instance_min, instance_max, kms_key,
+            coreos_channel, coreos_version, public_ports,
             private_ports):  # pragma: no cover
     setup_logging()
 
@@ -51,7 +62,9 @@ def service(environment, region, name, elb_scheme, dns_name, health_check,
         return
 
     updates = get_updates(elb_scheme, dns_name, health_check, instance_type,
-                          provision, public_ports, private_ports)
+                          provision, instance_min, instance_max, kms_key,
+                          coreos_channel, coreos_version, public_ports,
+                          private_ports)
 
     if not updates:
         logger.warn('No updates to do!')
@@ -62,7 +75,8 @@ def service(environment, region, name, elb_scheme, dns_name, health_check,
 
 
 def get_updates(elb_scheme, dns, health_check, instance_type, provision,
-                public_ports, private_ports):
+                instance_min, instance_max, kms_key, coreos_channel,
+                coreos_version, public_ports, private_ports):
     updates = {}
     if elb_scheme:
         updates['elb_scheme'] = elb_scheme
@@ -74,6 +88,17 @@ def get_updates(elb_scheme, dns, health_check, instance_type, provision,
         updates['instance_type'] = instance_type
     if provision is not None:
         updates['provision'] = provision
+    if instance_min is not None:
+        updates['instance_min'] = instance_min
+    if instance_max is not None:
+        updates['instance_max'] = instance_max
+    if kms_key:
+        updates['kms_key'] = kms_key
+    if coreos_channel:
+        updates['coreos_channel'] = coreos_channel
+    if coreos_version:
+        updates['coreos_version'] = coreos_version
+
     if public_ports:
         parsed_ports = {}
         for public_port in public_ports:
