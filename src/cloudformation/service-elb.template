@@ -507,7 +507,7 @@
         ],
         "HealthCheck": {
           "HealthyThreshold": "2",
-          "Interval": "5",
+          "Interval": "6",
           "Target": {"Ref": "HealthCheckTarget"},
           "Timeout": "5",
           "UnhealthyThreshold": "4"
