@@ -1,13 +1,13 @@
 import logging
 import time
-import boto.vpc
-from boto.exception import BotoServerError
+from boto.dynamodb2.exceptions import ItemNotFound
 from boto.dynamodb2.items import Item
 from collections import defaultdict
 
 logger = logging.getLogger('flotilla')
 
 INSTANCE_EXPIRY = 300
+REV_LENGTH = 64
 
 
 class FlotillaSchedulerDynamo(object):
@@ -22,7 +22,7 @@ class FlotillaSchedulerDynamo(object):
         self._segments = 1
         self._segment = 0
 
-    def get_revision_weights(self):
+    def get_all_revision_weights(self):
         """Load services, revisions and weights"""
         services = {}
         rev_count = 0
@@ -30,13 +30,23 @@ class FlotillaSchedulerDynamo(object):
             name = service['service_name']
 
             service_revs = {k: int(v) for k, v in service.items()
-                            if len(k) == 64}
+                            if len(k) == REV_LENGTH}
             services[name] = service_revs
             rev_count += len(service_revs)
 
         logger.debug('Loaded %s services, %s revisions', len(services),
                      rev_count)
         return services
+
+    def get_revision_weights(self, service_name):
+        """Load revision weights for a particular service.
+        :param service_name Service name.
+        """
+        try:
+            service = self._services.get_item(service_name=service_name)
+        except ItemNotFound:
+            return {}
+        return {k: int(v) for k, v in service.items() if len(k) == REV_LENGTH}
 
     def services(self):
         for service in self._services.scan(segment=self._segment,
@@ -47,6 +57,9 @@ class FlotillaSchedulerDynamo(object):
         return [s for s in self._stacks.scan()]
 
     def set_stacks(self, stacks):
+        if not stacks:
+            return
+
         with self._stacks.batch_write() as batch:
             for stack in stacks:
                 batch.put_item(stack)
@@ -113,10 +126,6 @@ class FlotillaSchedulerDynamo(object):
 
         return assignments
 
-    def get_region_params(self, regions):
-        keys = [{'region_name': region} for region in regions]
-        region_params = {}
-        for item in self._regions.batch_get(keys):
-            region_params[item['region_name']] = dict(item)
-
-        return region_params
+    def get_region_params(self, region):
+        region_item = self._regions.get_item(region_name=region)
+        return dict(region_item)

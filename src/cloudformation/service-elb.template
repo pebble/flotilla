@@ -472,7 +472,7 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "worker"]]},
+            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}]]},
             "PropagateAtLaunch": true
           }
         ]
@@ -507,7 +507,7 @@
         ],
         "HealthCheck": {
           "HealthyThreshold": "2",
-          "Interval": "30",
+          "Interval": "5",
           "Target": {"Ref": "HealthCheckTarget"},
           "Timeout": "5",
           "UnhealthyThreshold": "4"

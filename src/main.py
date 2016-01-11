@@ -5,7 +5,7 @@ import boto.utils
 
 def setup_logging():
     logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s - %(threadName)s - %(message)s')
+                        format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
     logging.getLogger('boto').setLevel(logging.CRITICAL)
 
 
@@ -15,19 +15,3 @@ def get_instance_id():
         return metadata['instance-id']
     except:
         return 'i-%s' % str(time.time()).replace('.', '')
-
-
-REGIONS = ('ap-northeast-1',
-           'ap-northeast-2',
-           'ap-southeast-1',
-           'ap-southeast-2',
-           'cn-north-1',
-           'eu-central-1',
-           'eu-west-1',
-           'sa-east-1',
-           'us-east-1',
-           'us-west-1',
-           'us-west-2')
-
-DEFAULT_REGIONS = ('us-east-1',)
-DEFAULT_ENVIRONMENT = 'develop'

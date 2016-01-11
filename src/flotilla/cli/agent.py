@@ -4,7 +4,8 @@ import boto.kms
 import click
 import logging
 
-from main import get_instance_id, setup_logging, REGIONS
+from main import get_instance_id
+from flotilla.cli.options import REGIONS
 from flotilla.agent import FlotillaAgent, FlotillaAgentDynamo, LoadBalancer, \
     SystemdUnits
 from flotilla.db import DynamoDbTables, DynamoDbLocks
@@ -25,7 +26,7 @@ def agent_cmd():  # pragma: no cover
     pass
 
 
-@agent_cmd.command()
+@agent_cmd.command(help='Start as agent.')
 @click.option('--service', type=click.STRING, envvar='FLOTILLA_SERVICE',
               help='Service name.')
 @click.option('--environment', type=click.STRING, envvar='FLOTILLA_ENV',
@@ -42,8 +43,6 @@ def agent_cmd():  # pragma: no cover
               help='Frequency of assignment reads (seconds).')
 def agent(service, environment, region, elb, health_interval,
           assignment_interval):  # pragma: no cover
-    """Start as agent."""
-    setup_logging()
     start_agent(environment, service, region, elb, health_interval,
                 assignment_interval)
 

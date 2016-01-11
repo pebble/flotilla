@@ -166,30 +166,14 @@ class FlotillaClientDynamo(object):
                 flotilla_revisions[rev].units.append(flotilla_unit)
         return flotilla_revisions.values()
 
-    def configure_regions(self, regions, updates):
-        if isinstance(regions, str):
-            regions = [regions]
-
-        # Load current items:
-        region_items = {}
-        keys = [{'region_name': region} for region in regions]
-        for item in self._regions.batch_get(keys):
-            region = item['region_name']
-            region_items[region] = item
-
-        # Create/update items:
-        for region in regions:
-            region_item = region_items.get(region)
-            if not region_item:
-                region_item = self._regions.new_item(region)
-                region_items[region] = region_item
-            for key, value in updates.items():
-                region_item[key] = value
-
-        # Store updated items:
-        with self._regions.batch_write() as batch:
-            for region_item in region_items.values():
-                batch.put_item(region_item)
+    def configure_region(self, region, updates):
+        try:
+            region_item = self._regions.get_item(region_name=region)
+        except ItemNotFound:
+            region_item = self._regions.new_item(region)
+        for key, value in updates.items():
+            region_item[key] = value
+        region_item.save()
 
     def configure_service(self, service, updates):
         try:

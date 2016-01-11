@@ -1,12 +1,12 @@
 import click
 import logging
 import boto.dynamodb2
+import boto.sqs
 
-from main import get_instance_id, setup_logging, REGIONS, DEFAULT_REGIONS, \
-    DEFAULT_ENVIRONMENT
+from main import get_instance_id
+from flotilla.cli.options import *
 from flotilla.db import DynamoDbTables, DynamoDbLocks
-from flotilla.scheduler import FlotillaCloudFormation, FlotillaSchedulerDynamo, \
-    FlotillaScheduler, CoreOsAmiIndex, FlotillaProvisioner
+from flotilla.scheduler import *
 from flotilla.thread import RepeatingFunc
 
 logger = logging.getLogger('flotilla')
@@ -35,7 +35,6 @@ def scheduler_cmd():  # pragma: no cover
               help='Frequency of provision loop (seconds).')
 def scheduler(environment, domain, region, lock_interval, loop_interval,
               provision_interval):  # pragma: no cover
-    setup_logging()
     start_scheduler(environment, domain, region, lock_interval, loop_interval,
                     provision_interval)
 
@@ -59,9 +58,13 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
                                      tables.status)
         locks = DynamoDbLocks(instance_id, tables.locks)
 
+        sqs = boto.sqs.connect_to_region(region)
+        message_q = sqs.get_queue(
+                'flotilla-%s-scheduler' % environment)
+
         # Assemble into scheduler:
         schedule = FlotillaScheduler(db, locks, lock_ttl=lock_interval * 3)
-        provisioner = FlotillaProvisioner(environment, schedule, db,
+        provisioner = FlotillaProvisioner(environment, region, schedule, db,
                                           cloudformation)
 
         funcs += [
@@ -72,6 +75,11 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
             RepeatingFunc('provisioner-%s' % region, provisioner.provision,
                           provision_interval)
         ]
+
+        if message_q:
+            messaging = FlotillaSchedulerMessaging(message_q, schedule)
+            funcs.append(RepeatingFunc('scheduler-message-%s' % region,
+                                       messaging.receive, 20.1))
 
     # Start loops:
     map(RepeatingFunc.start, funcs)

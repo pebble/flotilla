@@ -17,72 +17,84 @@ class FlotillaScheduler(object):
             return
 
         with self.__loop:
-            service_weights = self._db.get_revision_weights()
-            for service, revisions in service_weights.items():
-                logger.debug('Balancing assignments: %s (%s revisions).',
-                             service, len(revisions))
-                if len(revisions) == 0:
-                    continue
+            all_services = self._db.get_all_revision_weights()
+            for service, revisions in all_services.items():
+                self._schedule_service(service, revisions)
 
-                # Get all instances in the service (assigned or not):
-                current_assignments = self._db.get_instance_assignments(service)
-                if not current_assignments:
-                    logger.debug('No instances, can not assign %s.', service)
-                    continue
-                instance_count = sum(
-                    [len(rev_assignments) for rev_assignments in
-                     current_assignments.values()])
-                logger.debug("Found %s assignable instances.", instance_count)
+    def schedule_service(self, service):
+        if not self.active:
+            return False
 
-                # Determine ideal distribution of instances:
-                target_counts = self._instance_targets(revisions,
-                                                       instance_count)
-                logger.debug('Target instance counts: %s', target_counts)
+        with self.__loop:
+            revisions = self._db.get_revision_weights(service)
+            self._schedule_service(service, revisions)
+            return self.active
 
-                # Instances without an assignment can be scheduled:
-                assignable = current_assignments.get(None, [])
-                unassigned = len(assignable)
-                logger.debug("Found %s unassigned instances.", unassigned)
+    def _schedule_service(self, service, revisions):
+        logger.debug('Balancing assignments: %s (%s revisions).', service,
+                     len(revisions))
+        if len(revisions) == 0:
+            return
 
-                # Remove instances from no longer provisioned revs:
-                for rev, assigned_instances in current_assignments.items():
-                    if not rev:
-                        continue
-                    if rev not in target_counts:
-                        logger.debug('Unassigning %d instances from %s.',
-                                     len(assigned_instances), rev)
-                        assignable += assigned_instances
+        # Get all instances in the service (assigned or not):
+        current_assignments = self._db.get_instance_assignments(service)
+        if not current_assignments:
+            logger.debug('No instances, can not assign %s.', service)
+            return
+        instance_count = sum(
+                [len(rev_assignments) for rev_assignments in
+                 current_assignments.values()])
+        logger.debug("Found %s assignable instances.", instance_count)
 
-                # Remove instances from over-provisioned revs:
-                for rev, instance_count in target_counts.items():
-                    current_assignment = current_assignments.get(rev, [])
-                    to_unschedule = len(current_assignment) - instance_count
-                    if to_unschedule > 0:
-                        logger.debug('Unassigning %d instances from %s.',
-                                     to_unschedule, rev)
-                        assignable += current_assignments[rev][
-                                      to_unschedule * -1:]
-                logger.debug('Found %s assignable instances (%s unassigned).',
-                             len(assignable), unassigned)
+        # Determine ideal distribution of instances:
+        target_counts = self._instance_targets(revisions,
+                                               instance_count)
+        logger.debug('Target instance counts: %s', target_counts)
 
-                # Add instances to under-provisioned revs:
-                reassigned = []
-                for rev, instance_count in target_counts.items():
-                    current_assignment = current_assignments[rev]
-                    to_schedule = instance_count - len(current_assignment)
-                    if to_schedule > 0:
-                        logger.debug('Scheduling %d instances to %s.',
-                                     to_schedule, rev)
-                        scheduled = assignable[:to_schedule]
-                        for assignment_item in scheduled:
-                            assignment_item['assignment'] = rev
-                            reassigned.append(assignment_item)
-                        assignable = assignable[to_schedule:]
+        # Instances without an assignment can be scheduled:
+        assignable = current_assignments.get(None, [])
+        unassigned = len(assignable)
+        logger.debug("Found %s unassigned instances.", unassigned)
 
-                # Store assignment updates:
-                if reassigned and self.active:
-                    logger.debug('Storing %d reassignments.', len(reassigned))
-                    self._db.set_assignments(reassigned)
+        # Remove instances from no longer provisioned revs:
+        for rev, assigned_instances in current_assignments.items():
+            if not rev:
+                continue
+            if rev not in target_counts:
+                logger.debug('Unassigning %d instances from %s.',
+                             len(assigned_instances), rev)
+                assignable += assigned_instances
+
+        # Remove instances from over-provisioned revs:
+        for rev, instance_count in target_counts.items():
+            current_assignment = current_assignments.get(rev, [])
+            to_unschedule = len(current_assignment) - instance_count
+            if to_unschedule > 0:
+                logger.debug('Unassigning %d instances from %s.',
+                             to_unschedule, rev)
+                assignable += current_assignments[rev][
+                              to_unschedule * -1:]
+        logger.debug('Found %s assignable instances (%s unassigned).',
+                     len(assignable), unassigned)
+
+        # Add instances to under-provisioned revs:
+        reassigned = []
+        for rev, instance_count in target_counts.items():
+            current_assignment = current_assignments[rev]
+            to_schedule = instance_count - len(current_assignment)
+            if to_schedule > 0:
+                logger.debug('Scheduling %d instances to %s.',
+                             to_schedule, rev)
+                scheduled = assignable[:to_schedule]
+                for assignment_item in scheduled:
+                    assignment_item['assignment'] = rev
+                    reassigned.append(assignment_item)
+                assignable = assignable[to_schedule:]
+
+        # Store assignment updates:
+        if reassigned and self.active:
+            logger.debug('Storing %d reassignments.', len(reassigned))
+            self._db.set_assignments(reassigned)
 
     def lock(self):
         if self._locks.try_lock('scheduler', ttl=self._lock_ttl, refresh=True):

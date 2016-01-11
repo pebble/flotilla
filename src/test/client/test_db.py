@@ -128,15 +128,15 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.assertEqual(0, len(revisions))
 
     def test_configure_region_create(self):
-        self.db.configure_regions('us-east-1', {'az1': 'us-east-1a'})
-        self.regions.batch_write.assert_called_with()
+        self.regions.get_item.side_effect = ItemNotFound()
+        self.db.configure_region('us-east-1', {'az1': 'us-east-1a'})
+        self.regions.new_item.assert_called_with('us-east-1')
 
     def test_configure_region_exists(self):
-        self.regions.batch_get.return_value = [
-            {'region_name': 'us-east-1'}
-        ]
-        self.db.configure_regions('us-east-1', {'az1': 'us-east-1a'})
-        self.regions.batch_write.assert_called_with()
+        existing_region = MagicMock(spec=Item)
+        self.regions.get_item.return_value = existing_region
+        self.db.configure_region('us-east-1', {'az1': 'us-east-1a'})
+        existing_region.save.assert_called_with()
 
     def test_configure_service_create(self):
         self.services.get_item.side_effect = ItemNotFound()
