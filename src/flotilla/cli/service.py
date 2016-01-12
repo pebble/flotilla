@@ -13,6 +13,26 @@ logger = logging.getLogger('flotilla')
 
 ELB_SCHEMES = ('internal', 'internet-facing')
 
+HEALTH_CHECK_PROTOS = ('TCP', 'HTTP', 'HTTPS', 'SSL')
+
+
+def validate_health_check(ctx, param, value):
+    if value is None:
+        return
+
+    if ':' not in value:
+        raise click.BadParameter('Must be PROTO:PORT (TCP:80, HTTP:80/)')
+
+    proto, port = value.split(':')
+
+    if proto not in HEALTH_CHECK_PROTOS:
+        raise click.BadParameter(
+                'Invalid proto: %s, valid options are %s' % (
+                    proto, ', '.join(HEALTH_CHECK_PROTOS)))
+
+    if 'HTTP' in proto and '/' not in port:
+        raise click.BadParameter('HTTP check must include a path')
+
 
 @click.group()
 def service_cmd():  # pragma: no cover
@@ -31,6 +51,7 @@ def service_cmd():  # pragma: no cover
 @click.option('--dns-name', type=click.STRING,
               help='Custom DNS entry for service')
 @click.option('--health-check', type=click.STRING,
+              callback=validate_health_check,
               help='ELB health check target, http://goo.gl/6ue44c .')
 @click.option('--instance-type', type=click.Choice(INSTANCE_TYPES),
               help='Worker instance type.')
