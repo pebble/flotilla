@@ -1,7 +1,9 @@
 import unittest
 from mock import patch
+from click import BadParameter
 
-from flotilla.cli.service import configure_service, get_updates
+from flotilla.cli.service import configure_service, get_updates, \
+    validate_health_check
 
 ENVIRONMENT = 'develop'
 REGIONS = ('us-east-1', 'us-west-2')
@@ -65,3 +67,25 @@ class TestService(unittest.TestCase):
         configure_service(ENVIRONMENT, REGIONS, SERVICE, {})
         self.assertEquals(kms.call_count, len(REGIONS))
         self.assertEquals(dynamo.call_count, len(REGIONS))
+
+    def test_validate_health_check_invalid(self):
+        self.assert_invalid_health_check('10')
+
+    def test_validate_health_check_badproto(self):
+        self.assert_invalid_health_check('WS:443/')
+
+    def test_validate_health_check_no_path(self):
+        self.assert_invalid_health_check('HTTP:80')
+
+    def test_validate_health_check_tcp(self):
+        validate_health_check(None, None, 'TCP:6379')
+
+    def test_validate_health_check_http(self):
+        validate_health_check(None, None, 'HTTP:80/ping')
+
+    def test_validate_health_check_empty(self):
+        validate_health_check(None, None, None)
+
+    def assert_invalid_health_check(self, check):
+        self.assertRaises(BadParameter, validate_health_check, None, None,
+                          check)
