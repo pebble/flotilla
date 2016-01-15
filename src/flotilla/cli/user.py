@@ -52,3 +52,5 @@ def configure_user(environment, regions, name, ssh_keys, active):
                                   None)
 
         db.configure_user(name, updates)
+    logger.info('User: %s updated in region(s): %s updated.', name,
+                ', '.join(regions))
