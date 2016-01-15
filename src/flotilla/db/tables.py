@@ -13,7 +13,8 @@ SCHEMAS = {
     'services': [HashKey('service_name')],
     'stacks': [HashKey('stack_arn')],
     'status': [HashKey('service'), RangeKey('instance_id')],
-    'units': [HashKey('unit_hash')]
+    'units': [HashKey('unit_hash')],
+    'users': [HashKey('username')]
 }
 
 
@@ -31,6 +32,7 @@ class DynamoDbTables(object):
         self.stacks = None
         self.status = None
         self.units = None
+        self.users = None
 
     def setup(self, tables):
         tables = [t for t in tables if t in SCHEMAS]
