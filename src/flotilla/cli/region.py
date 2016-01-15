@@ -26,24 +26,15 @@ def region_cmd():  # pragma: no cover
               help='NAT instance CoreOS channel.')
 @click.option('--nat-coreos-version', type=click.STRING,
               help='NAT instance CoreOS version.')
+@click.option('--admin', type=click.STRING, multiple=True,
+              help='Administrative user(s).')
 def region(environment, region, nat_instance_type, nat_coreos_channel,
-           nat_coreos_version):  # pragma: no cover
-    if not region:
-        logger.warn('Must specify region(s) to update.')
-        return
-
-    updates = get_updates(nat_instance_type, nat_coreos_channel,
-                          nat_coreos_version)
-
-    if not updates:
-        logger.warn('No updates to do!')
-        return
-
-    configure_region(environment, region, updates)
-    logger.info('Regions %s updated.', ', '.join(region))
+           nat_coreos_version, admin):  # pragma: no cover
+    configure_region(environment, region, nat_instance_type, nat_coreos_channel,
+                     nat_coreos_version, admin)
 
 
-def get_updates(instance_type, coreos_channel, coreos_version):
+def get_updates(instance_type, coreos_channel, coreos_version, admins):
     updates = {}
     if instance_type:
         updates['nat_instance_type'] = instance_type
@@ -51,15 +42,39 @@ def get_updates(instance_type, coreos_channel, coreos_version):
         updates['nat_coreos_channel'] = coreos_channel
     if coreos_version:
         updates['nat_coreos_version'] = coreos_version
+    if len(admins) > 0:
+        updates['admins'] = list(admins)
     return updates
 
 
-def configure_region(environment, regions, updates):
+def configure_region(environment, regions, nat_instance_type,
+                     nat_coreos_channel, nat_coreos_version, admins):
+    if not regions:
+        logger.warn('Must specify region(s) to update.')
+        return
+
+    updates = get_updates(nat_instance_type, nat_coreos_channel,
+                          nat_coreos_version, admins)
+
+    if not updates:
+        logger.warn('No updates to do!')
+        return
+
     for aws_region in regions:
         dynamo = boto.dynamodb2.connect_to_region(aws_region)
 
         tables = DynamoDbTables(dynamo, environment=environment)
-        tables.setup(['regions'])
+        tables.setup(['regions', 'users'])
 
-        db = FlotillaClientDynamo(None, tables.regions, None, None, None, None)
+        db = FlotillaClientDynamo(None, tables.regions, None, None, None,
+                                  tables.users, None)
+
+        admins = updates.get('admins')
+        if admins:
+            missing_users = db.check_users(admins)
+            if len(missing_users) > 0:
+                logger.error('User(s): %s do not exist in %s.',
+                             ', '.join(missing_users), region)
+                continue
         db.configure_region(aws_region, updates)
+    logger.info('Region(s): %s updated.', ', '.join(regions))

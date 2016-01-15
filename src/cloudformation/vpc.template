@@ -11,6 +11,16 @@
       "Type": "AWS::EC2::Image::Id",
       "Description": "AMI for NAT instances."
     },
+    "FlotillaEnvironment": {
+      "Type": "String",
+      "Default": "develop",
+      "Description": "Name of environment. i.e. test, staging, production"
+    },
+    "FlotillaContainer": {
+      "Type": "String",
+      "Default": "pwagner/flotilla",
+      "Description": "Flotilla container version to use."
+    },
     "Az1": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
       "Description": "First AZ."
@@ -278,6 +288,12 @@
             "FromPort": "123",
             "ToPort": "123",
             "CidrIp": "192.168.0.0/16"
+          },
+          {
+            "IpProtocol": "icmp",
+            "FromPort": "8",
+            "ToPort": "-1",
+            "CidrIp": "192.168.0.0/16"
           }
         ],
         "Tags": [
@@ -323,6 +339,91 @@
                     "ec2:ReplaceRoute"
                   ],
                   "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "FlotillaDynamo",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-*"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-regions"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-services"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:BatchGetItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-users"
+                      ]
+                    ]
+                  }
                 }
               ]
             }
@@ -372,10 +473,28 @@
                 "\n",
                 "\n",
                 "users:", "\n",
-                "  - name: core", "\n",
-                "    ssh-authorized-keys:", "\n",
-                "      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDeaQWX1gvmJPKChpAET2ea688JudDtsn77XqvzcLf3na45Ri1RZA469vwxLpZ1y0VeQxNz74s0qh4+ZUuvO8u2ygkodgU0ZpeHVetXmd11Ct4JHhRicvXlDs07uyQPcl1QJaCbAzC89iBetuR+QJps3pE82sqjeL5uniZMoWFpzT3uicc7+bLepF6PY+PYYWWPRu6wjV876lFKZqABP7hzH7TJAMOa0tMRLcQRFLOUgMWHr3Hbw52VQWszGvhseA3uAUEJ1IEXkY10dSqvZkCykv2sjoGK7nSQqZTBx5B6rvuQoVIytI3VUrVbSMGJjStmGYV2RdFBrpmENJYAfRoG4bhkYBrt42UInNUwj84VLMVl0r/YbSAzFGzZzUvj2b2Dgz6lS4N4U4KFXQZlCGwlgFr+oR74La0c+pI+kwsYA9uV1a0eWiJig9V/6HLVY5P7mMCsVihqH2EjpZQDod03RlSBFqUv3Uf/7odT6bjewShTbDHs3isFyg4VAoZo4p1awKgmjTzGJDzrWlBdsBbJZlXVClIDhlOGkDRxrNeBoPJ4wywvXCtiwK2MRB7/Qq4j84p431V4N0rEsQa6kQXSyyOWoB/j4h92ZjEIYgKWMXjGkIi4Uj0njRA6zwur2n4F3fqrwvJaCXvXPE9Zjkq2d/aq7AxVuMpy7iLQonKrEQ==",
+                "  - name: _sshkeys", "\n",
+                "    homedir: /var/empty", "\n",
+                "    system: true", "\n",
+                "    primary-group: \"docker\"", "\n",
+                "    no-user-group: true", "\n",
+                "    shell: /sbin/nologin", "\n",
                 "\n",
+                "write_files:", "\n",
+                "  - path: /etc/ssh/sshd_config", "\n",
+                "    permissions: 0600", "\n",
+                "    owner: root:root", "\n",
+                "    content: |", "\n",
+                "      UsePrivilegeSeparation sandbox", "\n",
+                "      Subsystem sftp internal-sftp", "\n",
+                "      PermitRootLogin no", "\n",
+                "      AllowUsers core", "\n",
+                "      PasswordAuthentication no", "\n",
+                "      ChallengeResponseAuthentication no", "\n",
+                "      AuthorizedKeysCommand /bin/docker run --rm ",
+                {"Ref": "FlotillaContainer"}, " keys -r ",
+                {"Ref": "AWS::Region"}, "\n",
+                "      AuthorizedKeysCommandUser _sshkeys", "\n",
                 "\n"
               ]
             ]

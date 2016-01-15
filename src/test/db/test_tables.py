@@ -17,7 +17,7 @@ class TestDynamoDbTables(unittest.TestCase):
                 }
             }
         }
-        self.tables = DynamoDbTables(self.dynamo)
+        self.tables = DynamoDbTables(self.dynamo, backoff=0.001)
 
     def test_setup_existing(self):
         self.tables.setup(['revisions'])
@@ -35,10 +35,10 @@ class TestDynamoDbTables(unittest.TestCase):
 
         self.assertNotEqual(self.tables.revisions, None)
         self.dynamo.create_table.assert_called_with(
-            table_name='flotilla-revisions',
-            attribute_definitions=ANY,
-            key_schema=ANY,
-            provisioned_throughput=ANY
+                table_name='flotilla-revisions',
+                attribute_definitions=ANY,
+                key_schema=ANY,
+                provisioned_throughput=ANY
         )
 
     def test_setup_create_wait(self):

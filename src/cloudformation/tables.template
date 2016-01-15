@@ -257,6 +257,36 @@
         }
       }
     },
+    "UsersTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "users"
+            ]
+          ]
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "username",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "username",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": "1",
+          "WriteCapacityUnits": "1"
+        }
+      }
+    },
     "SchedulerMessageQueue": {
       "Type": "AWS::SQS::Queue",
       "Properties": {

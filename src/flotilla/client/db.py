@@ -36,12 +36,14 @@ class FlotillaClientDynamo(object):
         - BatchWriteItem
     """
 
-    def __init__(self, assignments, regions, revisions, services, units, kms):
+    def __init__(self, assignments, regions, revisions, services, units, users,
+                 kms):
         self._assignments = assignments
         self._regions = regions
         self._revisions = revisions
         self._services = services
         self._units = units
+        self._users = users
         self._kms = kms
 
     def add_revision(self, service, revision):
@@ -183,6 +185,24 @@ class FlotillaClientDynamo(object):
         for key, value in updates.items():
             service_item[key] = value
         service_item.save()
+
+    def configure_user(self, username, updates):
+        try:
+            user_item = self._users.get_item(username=username)
+        except ItemNotFound:
+            user_item = self._users.new_item(username)
+        for key, value in updates.items():
+            user_item[key] = value
+        user_item.save()
+
+    def check_users(self, usernames):
+        missing = set(usernames)
+        user_items = self._users.batch_get(
+                keys=[{'username': username} for username in usernames])
+        for user_item in user_items:
+            missing.remove(user_item['username'])
+        return missing
+
 
     def set_global(self, revision):
         rev_hash = self._store_revision(revision, None)

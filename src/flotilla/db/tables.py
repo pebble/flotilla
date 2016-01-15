@@ -13,12 +13,13 @@ SCHEMAS = {
     'services': [HashKey('service_name')],
     'stacks': [HashKey('stack_arn')],
     'status': [HashKey('service'), RangeKey('instance_id')],
-    'units': [HashKey('unit_hash')]
+    'units': [HashKey('unit_hash')],
+    'users': [HashKey('username')]
 }
 
 
 class DynamoDbTables(object):
-    def __init__(self, dynamo, environment=None):
+    def __init__(self, dynamo, environment=None, backoff=0.5):
         self._dynamo = dynamo
         if environment:
             self._prefix = 'flotilla-{0}-'.format(environment)
@@ -31,6 +32,8 @@ class DynamoDbTables(object):
         self.stacks = None
         self.status = None
         self.units = None
+        self.users = None
+        self.backoff = backoff
 
     def setup(self, tables):
         tables = [t for t in tables if t in SCHEMAS]
@@ -43,7 +46,7 @@ class DynamoDbTables(object):
             table = getattr(self, table_name)
             table_status = table.describe()['Table']['TableStatus']
             while table_status != 'ACTIVE':
-                time.sleep(0.5)
+                time.sleep(self.backoff)
                 table_status = table.describe()['Table']['TableStatus']
 
     def _table(self, name, schema, read, write):

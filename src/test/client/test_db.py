@@ -8,6 +8,7 @@ from boto.dynamodb2.items import Item
 from boto.kms.layer1 import KMSConnection
 
 SERVICE_NAME = 'foo'
+USERNAME = 'pwagner'
 
 
 class TestFlotillaClientDynamo(unittest.TestCase):
@@ -24,6 +25,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.revisions = MagicMock(spec=Table)
         self.services = MagicMock(spec=Table)
         self.units = MagicMock(spec=Table)
+        self.users = MagicMock(spec=Table)
         self.revision_item = MagicMock(spec=Item)
         self.revisions.has_item.return_value = False
         self.revisions.get_item.return_value = self.revision_item
@@ -46,6 +48,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
                                        self.revisions,
                                        self.services,
                                        self.units,
+                                       self.users,
                                        self.kms)
 
     def test_add_revision(self):
@@ -153,6 +156,21 @@ class TestFlotillaClientDynamo(unittest.TestCase):
 
         existing_service.save.assert_called_with()
 
+    def test_configure_user_create(self):
+        self.users.get_item.side_effect = ItemNotFound()
+
+        self.db.configure_user(USERNAME, {'key': 'value'})
+
+        self.users.new_item.assert_called_with(USERNAME)
+
+    def test_configure_user_exists(self):
+        existing_user = MagicMock(spec=Item)
+        self.users.get_item.return_value = existing_user
+
+        self.db.configure_user(USERNAME, {'key': 'value'})
+
+        existing_user.save.assert_called_with()
+
     def test_set_global(self):
         self.db.set_global(self.revision)
 
@@ -171,6 +189,15 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.assertEqual(unit['environment_key'], 'topsecret'.encode('base64'))
         self.assertTrue('environment_iv' in unit)
         self.assertTrue('environment_data' in unit)
+
+    def check_users(self):
+        usernames = ['found', 'missing']
+        self.users.batch_get.return_value = [
+            {'username': 'found'}
+        ]
+
+        missing_users = self.db.check_users(usernames)
+        self.assertEquals(missing_users, ['missing'])
 
     def test_store_revision_encryption(self):
         self.units.has_item.return_value = False
