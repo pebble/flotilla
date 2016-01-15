@@ -186,6 +186,15 @@ class FlotillaClientDynamo(object):
             service_item[key] = value
         service_item.save()
 
+    def configure_user(self, username, updates):
+        try:
+            user_item = self._users.get_item(username=username)
+        except ItemNotFound:
+            user_item = self._users.new_item(username)
+        for key, value in updates.items():
+            user_item[key] = value
+        user_item.save()
+
     def set_global(self, revision):
         rev_hash = self._store_revision(revision, None)
         self._assignments.put_item({

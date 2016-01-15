@@ -8,6 +8,7 @@ from boto.dynamodb2.items import Item
 from boto.kms.layer1 import KMSConnection
 
 SERVICE_NAME = 'foo'
+USERNAME = 'pwagner'
 
 
 class TestFlotillaClientDynamo(unittest.TestCase):
@@ -154,6 +155,21 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.db.configure_service(SERVICE_NAME, {'key': 'value'})
 
         existing_service.save.assert_called_with()
+
+    def test_configure_user_create(self):
+        self.users.get_item.side_effect = ItemNotFound()
+
+        self.db.configure_user(USERNAME, {'key': 'value'})
+
+        self.users.new_item.assert_called_with(USERNAME)
+
+    def test_configure_user_exists(self):
+        existing_user = MagicMock(spec=Item)
+        self.users.get_item.return_value = existing_user
+
+        self.db.configure_user(USERNAME, {'key': 'value'})
+
+        existing_user.save.assert_called_with()
 
     def test_set_global(self):
         self.db.set_global(self.revision)
