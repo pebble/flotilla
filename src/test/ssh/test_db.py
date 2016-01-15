@@ -93,3 +93,7 @@ class TestFlotillaSshDynamo(unittest.TestCase):
 
         keys = self.db.get_keys(REGION_ADMINS)
         self.assertEqual(keys, set(['foo', 'bar']))
+
+    def test_get_keys_noop(self):
+        keys = self.db.get_keys(())
+        self.assertEqual(keys, set())

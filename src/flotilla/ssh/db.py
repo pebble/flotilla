@@ -40,9 +40,12 @@ class FlotillaSshDynamo(object):
         return region_admins
 
     def get_keys(self, users):
+        ssh_keys = set()
+        if not users:
+            return ssh_keys
+
         user_keys = [{'username': u} for u in users]
         user_items = self._users.batch_get(keys=user_keys)
-        ssh_keys = set()
         for user_item in user_items:
             user_active = user_item.get('active', True)
             if not user_active:
