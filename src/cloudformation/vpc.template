@@ -288,6 +288,12 @@
             "FromPort": "123",
             "ToPort": "123",
             "CidrIp": "192.168.0.0/16"
+          },
+          {
+            "IpProtocol": "icmp",
+            "FromPort": "8",
+            "ToPort": "-1",
+            "CidrIp": "192.168.0.0/16"
           }
         ],
         "Tags": [
