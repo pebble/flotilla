@@ -76,4 +76,20 @@ class TestFlotillaSshDynamo(unittest.TestCase):
         ]
 
         keys = self.db.get_keys(REGION_ADMINS)
-        self.assertEqual(keys, ['foo', 'bar', 'foz', 'baz'])
+        self.assertEqual(keys, set(['foo', 'bar', 'foz', 'baz']))
+
+    def test_get_keys_inactive(self):
+        self.users.batch_get.return_value = [
+            {
+                'username': REGION_ADMINS[0],
+                'ssh_keys': ['foo', 'bar']
+            },
+            {
+                'username': REGION_ADMINS[1],
+                'ssh_keys': ['foz', 'baz'],
+                'active': 0
+            }
+        ]
+
+        keys = self.db.get_keys(REGION_ADMINS)
+        self.assertEqual(keys, set(['foo', 'bar']))
