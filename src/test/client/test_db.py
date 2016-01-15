@@ -190,6 +190,15 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.assertTrue('environment_iv' in unit)
         self.assertTrue('environment_data' in unit)
 
+    def check_users(self):
+        usernames = ['found', 'missing']
+        self.users.batch_get.return_value = [
+            {'username': 'found'}
+        ]
+
+        missing_users = self.db.check_users(usernames)
+        self.assertEquals(missing_users, ['missing'])
+
     def test_store_revision_encryption(self):
         self.units.has_item.return_value = False
         self.db._encrypt_environment = MagicMock(return_value=('blob', 'key'))

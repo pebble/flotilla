@@ -195,6 +195,15 @@ class FlotillaClientDynamo(object):
             user_item[key] = value
         user_item.save()
 
+    def check_users(self, usernames):
+        missing = set(usernames)
+        user_items = self._users.batch_get(
+                keys=[{'username': username} for username in usernames])
+        for user_item in user_items:
+            missing.remove(user_item['username'])
+        return missing
+
+
     def set_global(self, revision):
         rev_hash = self._store_revision(revision, None)
         self._assignments.put_item({
