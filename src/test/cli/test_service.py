@@ -78,13 +78,16 @@ class TestService(unittest.TestCase):
         self.assert_invalid_health_check('HTTP:80')
 
     def test_validate_health_check_tcp(self):
-        validate_health_check(None, None, 'TCP:6379')
+        health_check = validate_health_check(None, None, 'TCP:6379')
+        self.assertEquals('TCP:6379', health_check)
 
     def test_validate_health_check_http(self):
-        validate_health_check(None, None, 'HTTP:80/ping')
+        health_check = validate_health_check(None, None, 'HTTP:80/ping')
+        self.assertEquals('HTTP:80/ping', health_check)
 
     def test_validate_health_check_empty(self):
-        validate_health_check(None, None, None)
+        health_check = validate_health_check(None, None, None)
+        self.assertEquals(None, health_check)
 
     def assert_invalid_health_check(self, check):
         self.assertRaises(BadParameter, validate_health_check, None, None,

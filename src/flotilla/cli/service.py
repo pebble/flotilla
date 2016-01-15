@@ -29,9 +29,9 @@ def validate_health_check(ctx, param, value):
         raise click.BadParameter(
                 'Invalid proto: %s, valid options are %s' % (
                     proto, ', '.join(HEALTH_CHECK_PROTOS)))
-
     if 'HTTP' in proto and '/' not in port:
         raise click.BadParameter('HTTP check must include a path')
+    return value
 
 
 @click.group()
