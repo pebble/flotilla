@@ -100,6 +100,7 @@ class FlotillaCloudFormation(object):
         az3 = region.get('az3', '%sc' % region_name)
 
         return {
+            'FlotillaEnvironment': self._environment,
             'NatInstanceType': nat_instance_type,
             'NatAmi': nat_ami,
             'Az1': az1,

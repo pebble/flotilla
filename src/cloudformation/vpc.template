@@ -11,6 +11,11 @@
       "Type": "AWS::EC2::Image::Id",
       "Description": "AMI for NAT instances."
     },
+    "FlotillaEnvironment": {
+      "Type": "String",
+      "Default": "develop",
+      "Description": "Name of environment. i.e. test, staging, production"
+    },
     "FlotillaContainer": {
       "Type": "String",
       "Default": "pwagner/flotilla",
@@ -328,6 +333,91 @@
                     "ec2:ReplaceRoute"
                   ],
                   "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "FlotillaDynamo",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "", [
+                          "arn:aws:dynamodb:",
+                          {"Ref": "AWS::Region"},
+                          ":",
+                          {"Ref": "AWS::AccountId"},
+                          ":table/flotilla-",
+                          {"Ref": "FlotillaEnvironment"},
+                          "-*"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-regions"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-services"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:BatchGetItem"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:dynamodb:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":table/flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-users"
+                      ]
+                    ]
+                  }
                 }
               ]
             }
