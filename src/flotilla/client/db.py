@@ -36,12 +36,14 @@ class FlotillaClientDynamo(object):
         - BatchWriteItem
     """
 
-    def __init__(self, assignments, regions, revisions, services, units, kms):
+    def __init__(self, assignments, regions, revisions, services, units, users,
+                 kms):
         self._assignments = assignments
         self._regions = regions
         self._revisions = revisions
         self._services = services
         self._units = units
+        self._users = users
         self._kms = kms
 
     def add_revision(self, service, revision):

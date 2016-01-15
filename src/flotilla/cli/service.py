@@ -146,6 +146,7 @@ def configure_service(environment, regions, service_name, updates):
         kms = boto.kms.connect_to_region(region)
         tables = DynamoDbTables(dynamo, environment=environment)
         tables.setup(['services'])
-        db = FlotillaClientDynamo(None, None, None, tables.services, None, kms)
+        db = FlotillaClientDynamo(None, None, None, tables.services, None, None,
+                                  kms)
 
         db.configure_service(service_name, updates)

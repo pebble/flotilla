@@ -22,10 +22,10 @@ if __name__ == '__main__':
     dynamo = boto.dynamodb2.connect_to_region(db_region)
     kms = boto.kms.connect_to_region(db_region)
     tables = DynamoDbTables(dynamo, environment='develop')
-    tables.setup(['assignments', 'regions', 'revisions', 'services', 'units'])
+    tables.setup(['assignments', 'regions', 'revisions', 'services', 'units', 'users'])
     db = FlotillaClientDynamo(tables.assignments, tables.regions,
                               tables.revisions, tables.services, tables.units,
-                              kms)
+                              tables.users, kms)
 
     # Autoprovisioned ElasticSearch service:
     elasticsearch_dns = 'elasticsearch-develop.mycloudand.me'

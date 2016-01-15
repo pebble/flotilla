@@ -44,7 +44,7 @@ def add_revision(environment, regions, service_name, label, stream_in):
 
         tables.setup(['revisions', 'services', 'units'])
         db = FlotillaClientDynamo(None, None, tables.revisions, tables.services,
-                                  tables.units, kms)
+                                  tables.units, None, kms)
 
         db.add_revision(service_name, service_revision)
 

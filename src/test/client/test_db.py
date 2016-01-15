@@ -24,6 +24,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.revisions = MagicMock(spec=Table)
         self.services = MagicMock(spec=Table)
         self.units = MagicMock(spec=Table)
+        self.users = MagicMock(spec=Table)
         self.revision_item = MagicMock(spec=Item)
         self.revisions.has_item.return_value = False
         self.revisions.get_item.return_value = self.revision_item
@@ -46,6 +47,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
                                        self.revisions,
                                        self.services,
                                        self.units,
+                                       self.users,
                                        self.kms)
 
     def test_add_revision(self):

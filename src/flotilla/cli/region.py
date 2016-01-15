@@ -61,5 +61,6 @@ def configure_region(environment, regions, updates):
         tables = DynamoDbTables(dynamo, environment=environment)
         tables.setup(['regions'])
 
-        db = FlotillaClientDynamo(None, tables.regions, None, None, None, None)
+        db = FlotillaClientDynamo(None, tables.regions, None, None, None, None,
+                                  None)
         db.configure_region(aws_region, updates)
