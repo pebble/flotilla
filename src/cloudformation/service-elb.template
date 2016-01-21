@@ -649,6 +649,9 @@
   "Outputs": {
     "InstanceSg": {
       "Value": {"Ref": "InstanceSg"}
+    },
+    "Elb": {
+      "Value": {"Ref": "Elb"}
     }
   }
 }
