@@ -40,8 +40,7 @@ class FlotillaAgentDynamo(object):
         :param unit_status Unit statuses.
         """
         logger.debug('Storing status as %s.', self._id)
-        data = {name: json.dumps(status)
-                for name, status in unit_status.items()}
+        data = dict(unit_status)
         data['service'] = self._service
         data['instance_id'] = self._id
         data['status_time'] = time.time()

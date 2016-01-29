@@ -56,6 +56,19 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assertEqual(1, service_test[rev3])
         self.assertEqual(2, service_test[rev4])
 
+    def test_get_all_revision_weights_ignore_negative(self):
+        rev2 = REVISION.replace('a', 'b')
+        self.services.scan.return_value = [
+            {
+                'service_name': SERVICE,
+                'regions': ['us-east-1'],
+                REVISION: 1,
+                rev2: -2
+            }
+        ]
+        weights = self.db.get_all_revision_weights()
+        self.assertEqual(1, len(weights[SERVICE]))
+
     def test_get_service_revisions(self):
         self.services.get_item.return_value = {
             'service_name': SERVICE,
@@ -134,6 +147,15 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assertEqual(1, len(stacks))
         self.assertEquals('fred', stacks[0]['service_name'])
 
+    def test_get_stack(self):
+        self.db.get_stack('foo')
+        self.stacks.get_item.assert_called_with(stack_arn='foo')
+
+    def test_get_stack_not_found(self):
+        self.stacks.get_item.side_effect = ItemNotFound()
+        stack = self.db.get_stack('foo')
+        self.assertEqual(stack, None)
+
     def test_set_stacks(self):
         self.db.set_stacks([{'stack_arn': 'foo'}])
         self.stacks.batch_write.assert_called_with()
@@ -142,9 +164,40 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.db.set_stacks([])
         self.stacks.batch_write.assert_not_called()
 
+    def test_set_services(self):
+        self.db.set_services([{'service_name': 'foo'}])
+        self.services.batch_write.assert_called_with()
+
+    def test_set_services_empty(self):
+        self.db.set_services([])
+        self.services.batch_write.assert_not_called()
+
     def test_get_region_params(self):
         self.regions.get_item.return_value = {'region_name': 'us-east-1',
                                               'az1': 'us-east-1e'}
 
         region_params = self.db.get_region_params('us-east-1')
         self.assertEqual(region_params['az1'], 'us-east-1e')
+
+    def test_get_service_status(self):
+        self.status.query_2.return_value = [{
+            'instance_id': 'i-goodinstance',
+            'status_time': time.time(),
+            'test-%s.service' % REVISION: '{}'
+        }, {
+            'instance_id': 'i-anothergood',
+            'status_time': time.time(),
+            'test-%s.service' % REVISION: '{}'
+        }, {
+            'instance_id': INSTANCE_ID,
+            'status_time': time.time(),
+            'test-%s.service' % REVISION: '{}'
+        }, {
+            'instance_id': 'i-expired',
+            'status_time': time.time() - (INSTANCE_EXPIRY + 1),
+            'test-%s.service' % REVISION: '{}'
+        }]
+        status = {k: v for k, v in self.db.get_service_status(SERVICE,
+                                                              REVISION,
+                                                              INSTANCE_ID)}
+        self.assertEqual(len(status), 2)
