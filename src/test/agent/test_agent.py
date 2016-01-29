@@ -11,7 +11,7 @@ ASSIGNED_REVISION = '00000000000000000000000000000000'
 class TestFlotillaAgent(unittest.TestCase):
     def setUp(self):
         self.db = MagicMock(spec=FlotillaAgentDynamo)
-        self.db.get_assignment.return_value = ASSIGNED_REVISION
+        self.db.get_assignments.return_value = [ASSIGNED_REVISION]
         self.locks = MagicMock(spec=DynamoDbLocks)
         self.systemd = MagicMock(spec=SystemdUnits)
         self.systemd.get_unit_status.return_value = {}
@@ -24,7 +24,7 @@ class TestFlotillaAgent(unittest.TestCase):
         self.db.store_status.assert_called_with(ANY)
 
     def test_assignment_noop(self):
-        self.db.get_assignment.return_value = None
+        self.db.get_assignments.return_value = []
 
         self.agent.assignment()
 
@@ -35,6 +35,7 @@ class TestFlotillaAgent(unittest.TestCase):
 
         self.elb.unregister.assert_called_with()
         self.elb.register.assert_called_with()
+        self.db.get_units.assert_called_with([ASSIGNED_REVISION])
         self.locks.try_lock.assert_called_with('mock-service-deploy')
         self.locks.release_lock.assert_called_with('mock-service-deploy')
         self.systemd.set_units.assert_called_with(ANY)

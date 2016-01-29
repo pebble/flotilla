@@ -219,7 +219,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:GetItem"
+                    "dynamodb:BatchGetItem"
                   ],
                   "Resource": {
                     "Fn::Join": [
@@ -279,7 +279,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:GetItem"
+                    "dynamodb:BatchGetItem"
                   ],
                   "Resource": {
                     "Fn::Join": [
@@ -591,10 +591,10 @@
         ],
         "HealthCheck": {
           "HealthyThreshold": "2",
-          "Interval": "6",
+          "Interval": "5",
           "Target": {"Ref": "HealthCheckTarget"},
-          "Timeout": "5",
-          "UnhealthyThreshold": "4"
+          "Timeout": "2",
+          "UnhealthyThreshold": "3"
         },
         "SecurityGroups": [
           {"Ref": "ElbSg"}

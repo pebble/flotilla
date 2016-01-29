@@ -2,7 +2,7 @@ import logging
 from boto.dynamodb2.exceptions import ItemNotFound
 from collections import defaultdict
 from flotilla.model import FlotillaServiceRevision, FlotillaUnit, \
-    GLOBAL_ASSIGNMENT
+    GLOBAL_ASSIGNMENT, GLOBAL_ASSIGNMENT_SHARDS
 import json
 from Crypto.Cipher import AES
 from Crypto import Random
@@ -203,10 +203,12 @@ class FlotillaClientDynamo(object):
             missing.remove(user_item['username'])
         return missing
 
-
     def set_global(self, revision):
         rev_hash = self._store_revision(revision, None)
-        self._assignments.put_item({
-            'instance_id': GLOBAL_ASSIGNMENT,
-            'assignment': rev_hash
-        }, overwrite=True)
+        with self._assignments.batch_write() as batch:
+            for i in range(GLOBAL_ASSIGNMENT_SHARDS):
+                assignment_id = '%s_%d' % (GLOBAL_ASSIGNMENT, i)
+                batch.put_item({
+                    'instance_id': assignment_id,
+                    'assignment': rev_hash
+                }, overwrite=True)

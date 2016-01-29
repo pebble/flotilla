@@ -34,6 +34,10 @@ class TestFlotillaUnit(unittest.TestCase):
     def test_full_name(self):
         self.assertEqual(self.unit.full_name, UNIT_FULL_NAME)
 
+    def test_full_name_rev_hash(self):
+        self.unit.rev_hash = '000000'
+        self.assertEqual(self.unit.full_name, 'flotilla-test-000000.service')
+
 
 DOCKER_NAME = 'redis'
 DOCKER_IMAGE = 'redis:latest'

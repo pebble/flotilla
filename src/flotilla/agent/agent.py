@@ -10,26 +10,26 @@ class FlotillaAgent(object):
         self._locks = locks
         self._systemd = systemd
         self._elb = elb
-        self._assignment = None
+        self._assignments = []
 
     def assignment(self):
         """Check for active assignment and update if necessary."""
-        assignment = self._db.get_assignment()
-        # TODO: what about if global assignment changes?
-        if self._assignment != assignment:
-            logger.debug('Updated assignment: %s (was %s)', assignment,
-                         self._assignment)
-            assigned_units = self._db.get_units()
+        assignments = self._db.get_assignments()
+        if self._assignments != assignments:
+            logger.debug('Updated assignment: %s (was %s)', assignments,
+                         self._assignments)
+
+            units = self._db.get_units(assignments)
 
             deploy_lock = '%s-deploy' % self._service
             if self._locks.try_lock(deploy_lock):
                 try:
                     if self._elb:
                         self._elb.unregister()
-                    self._systemd.set_units(assigned_units)
+                    self._systemd.set_units(units)
 
                     if not self._elb or self._elb.register():
-                        self._assignment = assignment
+                        self._assignments = assignments
                 finally:
                     self._locks.release_lock(deploy_lock)
 

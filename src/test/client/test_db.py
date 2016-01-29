@@ -176,7 +176,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
 
         self.units.batch_write.assert_called_with()
         self.revisions.new_item.assert_called_with(ANY)
-        self.assignments.put_item.assert_called_with(ANY, overwrite=True)
+        self.assignments.batch_write.assert_called_with()
 
     def test_encrypt_environment(self):
         self.kms.generate_data_key.return_value = {
