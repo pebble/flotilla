@@ -16,7 +16,6 @@ class RegionMetadata(object):
                          for region in regions}
 
         scheduler_regions = region_params.values()
-        print scheduler_regions
         if not per_region:
             scheduler_regions = (region_params[regions[0]],)
         for scheduler_region in scheduler_regions:

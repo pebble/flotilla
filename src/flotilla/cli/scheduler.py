@@ -84,7 +84,7 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
             messaging = FlotillaSchedulerMessaging(message_q, schedule, doctor)
 
             funcs.append(RepeatingFunc('scheduler-message-%s' % region,
-                                       messaging.receive, 20.1))
+                                       messaging.receive, 0))
         except ClientError as e:
             error_code = e.response['Error'].get('Code')
             if error_code == QUEUE_NOT_FOUND:

@@ -39,13 +39,14 @@ class FlotillaAgentDynamo(object):
         """Store unit status.
         :param unit_status Unit statuses.
         """
-        logger.debug('Storing status as %s.', self._id)
+        logger.debug('Storing status as %s...', self._id)
         data = dict(unit_status)
         data['service'] = self._service
         data['instance_id'] = self._id
         data['status_time'] = time.time()
         self._status.put_item(data=data, overwrite=True)
-        logger.debug('Stored status as %s.', self._id)
+        logger.info('Stored status of %s units as %s.', len(unit_status),
+                    self._id)
 
     def get_assignments(self):
         assignments = self._assignments.batch_get([

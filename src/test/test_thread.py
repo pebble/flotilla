@@ -33,6 +33,15 @@ class TestRepeatingFunc(unittest.TestCase):
         assert self.count > 1
         assert self.count < 3
 
+    def test_run_no_interval(self):
+        instant_function = MagicMock()
+        f = RepeatingFunc('test', instant_function, 0)
+        f.start()
+        time.sleep(0.01)
+        f.stop()
+        f.join()
+        assert instant_function.call_count > 20
+
     def run_loop(self, instant_function):
         f = RepeatingFunc('test', instant_function, 0.01)
         f.start()

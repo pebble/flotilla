@@ -22,8 +22,12 @@ class RepeatingFunc(threading.Thread):
                 self._func()
             except Exception as e:
                 logger.exception(e)
+
             duration = time.time() - start
             interval = self._interval
+            if not interval:
+                logger.debug('Function took %f, repeating.', duration)
+                continue
             if duration > interval:
                 logger.warn('Function took %f, this is too slow for %f.',
                             duration, interval)
