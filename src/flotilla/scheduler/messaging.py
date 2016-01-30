@@ -11,9 +11,9 @@ class FlotillaSchedulerMessaging(object):
         self._doctor = doctor
 
     def receive(self):
-        for msg in self._q.get_messages(wait_time_seconds=20):
+        for msg in self._q.receive_messages(WaitTimeSeconds=20):
             try:
-                payload = json.loads(msg.get_body())
+                payload = json.loads(msg.body)
                 msg_type = payload['type']
             except:
                 logger.warn('Invalid message')

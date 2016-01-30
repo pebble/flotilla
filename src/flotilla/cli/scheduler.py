@@ -1,8 +1,8 @@
 import click
 import logging
 import boto.dynamodb2
-import boto.sqs
 import boto3
+from botocore.exceptions import ClientError
 
 from main import get_instance_id
 from flotilla.cli.options import *
@@ -11,6 +11,8 @@ from flotilla.scheduler import *
 from flotilla.thread import RepeatingFunc
 
 logger = logging.getLogger('flotilla')
+
+QUEUE_NOT_FOUND = 'AWS.SimpleQueueService.NonExistentQueue'
 
 
 @click.group()
@@ -59,10 +61,6 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
                                      tables.status)
         locks = DynamoDbLocks(instance_id, tables.locks)
 
-        sqs = boto.sqs.connect_to_region(region)
-        queue_name = 'flotilla-%s-scheduler' % environment
-        message_q = sqs.get_queue(queue_name)
-
         # Assemble into scheduler:
         schedule = FlotillaScheduler(db, locks, lock_ttl=lock_interval * 3)
         provisioner = FlotillaProvisioner(environment, region, schedule, db,
@@ -77,13 +75,20 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
                           provision_interval)
         ]
 
-        if message_q:
+        queue_name = 'flotilla-%s-scheduler' % environment
+        sqs = boto3.resource('sqs', region)
+        try:
+            message_q = sqs.get_queue_by_name(QueueName=queue_name)
             elb = boto3.client('elb', region)
             doctor = ServiceDoctor(db, elb)
-
             messaging = FlotillaSchedulerMessaging(message_q, schedule, doctor)
+
             funcs.append(RepeatingFunc('scheduler-message-%s' % region,
                                        messaging.receive, 20.1))
+        except ClientError as e:
+            error_code = e.response['Error'].get('Code')
+            if error_code == QUEUE_NOT_FOUND:
+                logger.info('Scheduler message queue not found.')
 
     # Start loops:
     map(RepeatingFunc.start, funcs)

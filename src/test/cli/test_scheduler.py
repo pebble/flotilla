@@ -1,9 +1,9 @@
 import unittest
 from mock import patch, MagicMock
 
-from boto.sqs.connection import SQSConnection
+from botocore.exceptions import ClientError
 
-from flotilla.cli.scheduler import start_scheduler
+from flotilla.cli.scheduler import start_scheduler, QUEUE_NOT_FOUND
 
 REGIONS = ['us-east-1']
 ENVIRONMENT = 'develop'
@@ -15,7 +15,7 @@ class TestScheduler(unittest.TestCase):
     @patch('flotilla.cli.scheduler.DynamoDbTables')
     @patch('flotilla.cli.scheduler.RepeatingFunc')
     @patch('boto.dynamodb2.connect_to_region')
-    @patch('boto.sqs.connect_to_region')
+    @patch('boto3.resource')
     def test_start_scheduler(self, sqs, dynamo, repeat, tables,
                              get_instance_id):
         get_instance_id.return_value = 'i-123456'
@@ -28,7 +28,7 @@ class TestScheduler(unittest.TestCase):
     @patch('flotilla.cli.scheduler.DynamoDbTables')
     @patch('flotilla.cli.scheduler.RepeatingFunc')
     @patch('boto.dynamodb2.connect_to_region')
-    @patch('boto.sqs.connect_to_region')
+    @patch('boto3.resource')
     def test_start_scheduler_multiregion(self, sqs, dynamo, repeat, tables,
                                          get_instance_id):
         get_instance_id.return_value = 'i-123456'
@@ -42,11 +42,12 @@ class TestScheduler(unittest.TestCase):
     @patch('flotilla.cli.scheduler.DynamoDbTables')
     @patch('flotilla.cli.scheduler.RepeatingFunc')
     @patch('boto.dynamodb2.connect_to_region')
-    @patch('boto.sqs.connect_to_region')
+    @patch('boto3.resource')
     def test_start_scheduler_without_messaging(self, sqs, dynamo, repeat,
                                                tables, get_instance_id):
-        mock_sqs = MagicMock(spec=SQSConnection)
-        mock_sqs.get_queue.return_value = None
+        mock_sqs = MagicMock()
+        client_error = ClientError({'Error': {'Code': QUEUE_NOT_FOUND}}, '')
+        mock_sqs.get_queue_by_name.side_effect = client_error
         sqs.return_value = mock_sqs
 
         start_scheduler(ENVIRONMENT, DOMAIN, REGIONS, 0.1, 0.1, 0.1)

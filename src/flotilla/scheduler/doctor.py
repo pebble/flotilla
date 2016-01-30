@@ -45,7 +45,7 @@ class ServiceDoctor(object):
                 logger.info('Diagnosis: %s is broken.', instance)
                 return
 
-        logger.info('Diagnosis: %s is broken', rev)
+        logger.info('Diagnosis: %s is broken.', rev)
         service_item[rev] *= -1
         self._db.set_services([service_item])
 
