@@ -5,9 +5,10 @@ logger = logging.getLogger('flotilla')
 
 
 class FlotillaSchedulerMessaging(object):
-    def __init__(self, messages_q, scheduler):
+    def __init__(self, messages_q, scheduler, doctor):
         self._q = messages_q
         self._scheduler = scheduler
+        self._doctor = doctor
 
     def receive(self):
         for msg in self._q.get_messages(wait_time_seconds=20):
@@ -24,12 +25,10 @@ class FlotillaSchedulerMessaging(object):
                 logger.debug('Service reschedule: %s', service)
                 self._scheduler.schedule_service(service)
             elif msg_type == 'ServiceDidNotStart':
-                instance = payload['instance']
+                service = payload['service']
                 rev = payload['revision']
-                logger.info('Failed revision on %s: %s', instance, rev)
-                # TODO: are there other instances running the same rev?
-                # if yes, terminate _this_ instance because it's broken
-                # if no, flag revision as broken and drop from scheduling
+                instance = payload['instance']
+                self._doctor.failed_revision(service, rev, instance)
             else:
                 logger.warn('Unknown message: %s', msg_type)
             msg.delete()

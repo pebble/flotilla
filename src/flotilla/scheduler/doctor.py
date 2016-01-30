@@ -23,6 +23,9 @@ class ServiceDoctor(object):
         if not service_item:
             logger.warn('Service %s not found.', service)
             return
+        if rev not in service_item:
+            logger.warn('Service %s does not have revision %s.', service, rev)
+            return
 
         logger.info('Diagnosing error of %s in %s on %s...', rev, service,
                     instance)

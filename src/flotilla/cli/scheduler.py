@@ -2,6 +2,7 @@ import click
 import logging
 import boto.dynamodb2
 import boto.sqs
+import boto3
 
 from main import get_instance_id
 from flotilla.cli.options import *
@@ -59,8 +60,8 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
         locks = DynamoDbLocks(instance_id, tables.locks)
 
         sqs = boto.sqs.connect_to_region(region)
-        message_q = sqs.get_queue(
-                'flotilla-%s-scheduler' % environment)
+        queue_name = 'flotilla-%s-scheduler' % environment
+        message_q = sqs.get_queue(queue_name)
 
         # Assemble into scheduler:
         schedule = FlotillaScheduler(db, locks, lock_ttl=lock_interval * 3)
@@ -77,7 +78,10 @@ def start_scheduler(environment, domain, regions, lock_interval, loop_interval,
         ]
 
         if message_q:
-            messaging = FlotillaSchedulerMessaging(message_q, schedule)
+            elb = boto3.client('elb', region)
+            doctor = ServiceDoctor(db, elb)
+
+            messaging = FlotillaSchedulerMessaging(message_q, schedule, doctor)
             funcs.append(RepeatingFunc('scheduler-message-%s' % region,
                                        messaging.receive, 20.1))
 
