@@ -42,12 +42,17 @@ class FlotillaSchedulerDynamo(object):
         """Load revision weights for a particular service.
         :param service_name Service name.
         """
-        try:
-            service = self._services.get_item(service_name=service_name)
-        except ItemNotFound:
+        service = self.get_service(service_name)
+        if not service:
             return {}
         return {k: int(v) for k, v in service.items()
                 if len(k) == REV_LENGTH and v >= 0}
+
+    def get_service(self, service_name):
+        try:
+            return self._services.get_item(service_name=service_name)
+        except ItemNotFound:
+            return None
 
     def services(self):
         for service in self._services.scan(segment=self._segment,
@@ -56,12 +61,6 @@ class FlotillaSchedulerDynamo(object):
 
     def get_stacks(self):
         return [s for s in self._stacks.scan()]
-
-    def get_stack(self, stack_arn):
-        try:
-            return self._stacks.get_item(stack_arn=stack_arn)
-        except ItemNotFound:
-            return None
 
     def set_stacks(self, stacks):
         if not stacks:

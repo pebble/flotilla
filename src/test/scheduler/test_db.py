@@ -147,15 +147,6 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.assertEqual(1, len(stacks))
         self.assertEquals('fred', stacks[0]['service_name'])
 
-    def test_get_stack(self):
-        self.db.get_stack('foo')
-        self.stacks.get_item.assert_called_with(stack_arn='foo')
-
-    def test_get_stack_not_found(self):
-        self.stacks.get_item.side_effect = ItemNotFound()
-        stack = self.db.get_stack('foo')
-        self.assertEqual(stack, None)
-
     def test_set_stacks(self):
         self.db.set_stacks([{'stack_arn': 'foo'}])
         self.stacks.batch_write.assert_called_with()
