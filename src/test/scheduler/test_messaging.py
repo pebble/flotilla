@@ -3,7 +3,9 @@ from mock import MagicMock
 import json
 
 from flotilla.scheduler.doctor import ServiceDoctor
-from flotilla.scheduler.messaging import FlotillaSchedulerMessaging
+from flotilla.scheduler.messaging import FlotillaSchedulerMessaging, \
+    MESSAGE_RESCHEDULE, MESSAGE_SERVICE_FAILURE
+
 from flotilla.scheduler.scheduler import FlotillaScheduler
 
 SERVICE = 'test'
@@ -36,7 +38,7 @@ class TestFlotillaSchedulerMessaging(unittest.TestCase):
 
     def test_receive_service_reschedule(self):
         self.message.body = json.dumps({
-            'type': 'ServiceReschedule',
+            'type': MESSAGE_RESCHEDULE,
             'service': SERVICE
         })
 
@@ -47,7 +49,7 @@ class TestFlotillaSchedulerMessaging(unittest.TestCase):
 
     def test_receive_service_did_not_start(self):
         self.message.body = json.dumps({
-            'type': 'ServiceDidNotStart',
+            'type': MESSAGE_SERVICE_FAILURE,
             'service': SERVICE,
             'revision': 'abcdef',
             'instance': 'i-123456',

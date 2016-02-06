@@ -3,6 +3,9 @@ import logging
 
 logger = logging.getLogger('flotilla')
 
+MESSAGE_RESCHEDULE = 'ServiceReschedule'
+MESSAGE_SERVICE_FAILURE = 'ServiceDidNotStart'
+
 
 class FlotillaSchedulerMessaging(object):
     def __init__(self, messages_q, scheduler, doctor):
@@ -20,11 +23,11 @@ class FlotillaSchedulerMessaging(object):
                 msg.delete()
                 continue
 
-            if msg_type == 'ServiceReschedule':
+            if msg_type == MESSAGE_RESCHEDULE:
                 service = payload['service']
                 logger.debug('Service reschedule: %s', service)
                 self._scheduler.schedule_service(service)
-            elif msg_type == 'ServiceDidNotStart':
+            elif msg_type == MESSAGE_SERVICE_FAILURE:
                 service = payload['service']
                 rev = payload['revision']
                 instance = payload['instance']

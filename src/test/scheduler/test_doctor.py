@@ -33,7 +33,6 @@ class TestServiceDoctor(unittest.TestCase):
         self.db.set_services.assert_not_called()
 
     def test_failed_revision_bad_rev(self):
-        self.db.get_service.return_value = None
         self.doctor.failed_revision(SERVICE, 'abcdef', INSTANCE)
         self.db.set_services.assert_not_called()
 

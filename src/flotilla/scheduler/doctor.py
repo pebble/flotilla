@@ -23,7 +23,7 @@ class ServiceDoctor(object):
         if not service_item:
             logger.warn('Service %s not found.', service)
             return
-        if rev not in service_item:
+        if rev not in service_item or service_item[rev] < 0:
             logger.warn('Service %s does not have revision %s.', service, rev)
             return
 
