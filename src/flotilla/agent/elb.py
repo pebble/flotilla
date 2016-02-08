@@ -40,7 +40,7 @@ class LoadBalancer(object):
         logger.debug('Unregistered from %s.', self._elb_name)
         return state
 
-    def register(self, timeout=300):
+    def register(self, timeout=120):
         """Register and wait for health checks
         :param timeout Max time to wait
         :return Boolean registration state.

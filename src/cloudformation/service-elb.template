@@ -219,7 +219,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:GetItem"
+                    "dynamodb:BatchGetItem"
                   ],
                   "Resource": {
                     "Fn::Join": [
@@ -279,7 +279,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "dynamodb:GetItem"
+                    "dynamodb:BatchGetItem"
                   ],
                   "Resource": {
                     "Fn::Join": [
@@ -438,6 +438,43 @@
               },
               {"Ref": "AWS::NoValue"}
             ]
+          },
+          {
+            "PolicyName": "FlotillaQueue",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:GetQueueUrl",
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "", [
+                        "arn:aws:sqs:",
+                        {"Ref": "AWS::Region"},
+                        ":",
+                        {"Ref": "AWS::AccountId"},
+                        ":flotilla-",
+                        {"Ref": "FlotillaEnvironment"},
+                        "-scheduler"
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueUrl",
+                    "sqs:ReceiveMessage",
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {"Fn::GetAtt": ["ServiceMessageQueue", "Arn"]}
+                }
+              ]
+            }
           }
         ],
         "Path": "/"
@@ -591,10 +628,10 @@
         ],
         "HealthCheck": {
           "HealthyThreshold": "2",
-          "Interval": "6",
+          "Interval": "5",
           "Target": {"Ref": "HealthCheckTarget"},
-          "Timeout": "5",
-          "UnhealthyThreshold": "4"
+          "Timeout": "2",
+          "UnhealthyThreshold": "3"
         },
         "SecurityGroups": [
           {"Ref": "ElbSg"}
@@ -644,11 +681,26 @@
           }
         ]
       }
+    },
+    "ServiceMessageQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Fn::Join": [
+            "-", [
+              "flotilla",
+              {"Ref": "FlotillaEnvironment"},
+              "service",
+              {"Ref": "ServiceName"}
+            ]
+          ]
+        }
+      }
     }
   },
   "Outputs": {
-    "InstanceSg": {
-      "Value": {"Ref": "InstanceSg"}
+    "Elb": {
+      "Value": {"Ref": "Elb"}
     }
   }
 }

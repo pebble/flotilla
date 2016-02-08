@@ -4,14 +4,17 @@ import time
 
 UNIT_PREFIX = 'flotilla-'
 GLOBAL_ASSIGNMENT = 'global'
+GLOBAL_ASSIGNMENT_SHARDS = 16
+
 
 class FlotillaUnit(object):
     """Systemd unit file and configuration (environment variables)."""
 
-    def __init__(self, name, unit_file, environment={}):
+    def __init__(self, name, unit_file, environment={}, rev_hash=None):
         self.name = name
         self.unit_file = unit_file
         self.environment = environment or {}
+        self.rev_hash = rev_hash
 
     def __str__(self):
         return 'Unit: %s' % self.name
@@ -29,7 +32,8 @@ class FlotillaUnit(object):
     @property
     def full_name(self):
         name, ext = os.path.splitext(self.name)
-        return '%s%s-%s%s' % (UNIT_PREFIX, name, self.unit_hash, ext)
+        hash = self.rev_hash or self.unit_hash
+        return '%s%s-%s%s' % (UNIT_PREFIX, name, hash, ext)
 
 
 class FlotillaDockerService(FlotillaUnit):

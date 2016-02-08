@@ -30,7 +30,7 @@ class FlotillaSchedulerDynamo(object):
             name = service['service_name']
 
             service_revs = {k: int(v) for k, v in service.items()
-                            if len(k) == REV_LENGTH}
+                            if len(k) == REV_LENGTH and v >= 0}
             services[name] = service_revs
             rev_count += len(service_revs)
 
@@ -42,11 +42,17 @@ class FlotillaSchedulerDynamo(object):
         """Load revision weights for a particular service.
         :param service_name Service name.
         """
-        try:
-            service = self._services.get_item(service_name=service_name)
-        except ItemNotFound:
+        service = self.get_service(service_name)
+        if not service:
             return {}
-        return {k: int(v) for k, v in service.items() if len(k) == REV_LENGTH}
+        return {k: int(v) for k, v in service.items()
+                if len(k) == REV_LENGTH and v >= 0}
+
+    def get_service(self, service_name):
+        try:
+            return self._services.get_item(service_name=service_name)
+        except ItemNotFound:
+            return None
 
     def services(self):
         for service in self._services.scan(segment=self._segment,
@@ -63,6 +69,13 @@ class FlotillaSchedulerDynamo(object):
         with self._stacks.batch_write() as batch:
             for stack in stacks:
                 batch.put_item(stack)
+
+    def set_services(self, services):
+        if not services:
+            return
+        with self._services.batch_write() as batch:
+            for service in services:
+                batch.put_item(service)
 
     def set_assignment(self, service, machine, assignment):
         self._assignments.put_item(data={
@@ -129,3 +142,17 @@ class FlotillaSchedulerDynamo(object):
     def get_region_params(self, region):
         region_item = self._regions.get_item(region_name=region)
         return dict(region_item)
+
+    def get_service_status(self, service, rev, instance=None):
+        cutoff = time.time() - INSTANCE_EXPIRY
+        for status in self._status.query_2(service__eq=service):
+            instance_id = status['instance_id']
+            if instance_id == instance or status['status_time'] < cutoff:
+                continue
+            parsed = {}
+            for service, service_status in status.items():
+                if rev in service:
+                    parsed[service] = service_status
+
+            if parsed:
+                yield instance_id, parsed

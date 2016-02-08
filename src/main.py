@@ -7,6 +7,8 @@ def setup_logging():
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
     logging.getLogger('boto').setLevel(logging.CRITICAL)
+    logging.getLogger('boto3').setLevel(logging.CRITICAL)
+    logging.getLogger('botocore').setLevel(logging.CRITICAL)
 
 
 def get_instance_id():

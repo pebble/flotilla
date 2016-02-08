@@ -1,13 +1,14 @@
 import boto.dynamodb2
 import boto.ec2.elb
 import boto.kms
+import boto3
 import click
 import logging
 
 from main import get_instance_id
 from flotilla.cli.options import REGIONS
-from flotilla.agent import FlotillaAgent, FlotillaAgentDynamo, LoadBalancer, \
-    SystemdUnits
+from flotilla.agent import *
+from flotilla.cli.utils import get_queue
 from flotilla.db import DynamoDbTables, DynamoDbLocks
 from flotilla.thread import RepeatingFunc
 
@@ -78,13 +79,26 @@ def start_agent(environment, service, region, elb_name, health_interval,
                              tables.units, kms)
     locks = DynamoDbLocks(instance_id, tables.locks)
 
+    # SQS:
+    sqs = boto3.resource('sqs', region)
+    scheduler_q = get_queue(sqs, 'flotilla-%s-scheduler' % environment)
+    service_q = get_queue(sqs, 'flotilla-%s-service-%s' %
+                          (environment, service))
+
+    messaging = FlotillaAgentMessaging(service, instance_id, scheduler_q,
+                                       service_q)
+
     # Assemble into agent:
-    agent = FlotillaAgent(service, db, locks, systemd, lb)
+    agent = FlotillaAgent(service, db, locks, systemd, messaging, lb)
 
     # Start loops:
     funcs = [
         RepeatingFunc('health', agent.health, health_interval),
         RepeatingFunc('assignment', agent.assignment, assignment_interval),
     ]
+
+    if service_q:
+        funcs.append(RepeatingFunc('message', messaging.receive, 0))
+
     map(RepeatingFunc.start, funcs)
     logger.info('Startup complete.')

@@ -80,7 +80,6 @@ class SystemdUnits(object):
                 env_path = os.path.join(self._env_dir, name)
                 if not os.path.exists(env_path):
                     logger.debug('Writing environment file: %s', env_path)
-                    # TODO: KMS decrypt
                     with open(env_path, 'w') as env_file:
                         for key, value in unit.environment.items():
                             env_file.write(key)

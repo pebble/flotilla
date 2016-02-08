@@ -261,7 +261,10 @@
                     "route53:ChangeResourceRecordSets",
                     "route53:GetChange",
                     "route53:ListHostedZones",
-                    "route53:ListResourceRecordSets"
+                    "route53:ListResourceRecordSets",
+                    "sqs:CreateQueue",
+                    "sqs:DeleteQueue",
+                    "sqs:ListQueues"
                   ],
                   "Resource": "*"
                 }
@@ -357,6 +360,7 @@
                 {
                   "Effect": "Allow",
                   "Action": [
+                    "dynamodb:BatchWriteItem",
                     "dynamodb:GetItem",
                     "dynamodb:Scan"
                   ],

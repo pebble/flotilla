@@ -70,3 +70,10 @@ class DynamoDbLocks(object):
                 logger.debug('Lock belongs to %s, unable to release', owner)
         except ItemNotFound:
             logger.debug('Lock %s not found to release', name)
+
+    def get_owner(self, name):
+        try:
+            lock_item = self._locks.get_item(lock_name=name, consistent=True)
+            return lock_item['owner'], float(lock_item['acquire_time'])
+        except ItemNotFound:
+            return None, None

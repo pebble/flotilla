@@ -21,7 +21,7 @@ class FlotillaProvisioner(object):
         service_stacks = {}
         for service in self._db.services():
             name = service['service_name']
-            services[name] = dict(service)
+            services[name] = service
             if service.get('provision', True):
                 service_stacks[name] = None
 
@@ -59,6 +59,7 @@ class FlotillaProvisioner(object):
             self._db.set_stacks(changed_stacks)
             return
 
+        changed_services = []
         for service_name, service_stack in service_stacks.items():
             service = services[service_name]
 
@@ -68,5 +69,9 @@ class FlotillaProvisioner(object):
                                                              service_stack)
             if new_service_stack:
                 changed_stacks.append(new_service_stack)
-
+                service_outputs = new_service_stack.get('outputs')
+                if service_outputs:
+                    service['cf_outputs'] = service_outputs
+                    changed_services.append(service)
+        self._db.set_services(changed_services)
         self._db.set_stacks(changed_stacks)

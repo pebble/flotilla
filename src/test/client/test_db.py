@@ -176,7 +176,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
 
         self.units.batch_write.assert_called_with()
         self.revisions.new_item.assert_called_with(ANY)
-        self.assignments.put_item.assert_called_with(ANY, overwrite=True)
+        self.assignments.batch_write.assert_called_with()
 
     def test_encrypt_environment(self):
         self.kms.generate_data_key.return_value = {
@@ -190,14 +190,14 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         self.assertTrue('environment_iv' in unit)
         self.assertTrue('environment_data' in unit)
 
-    def check_users(self):
+    def test_check_users(self):
         usernames = ['found', 'missing']
         self.users.batch_get.return_value = [
             {'username': 'found'}
         ]
 
         missing_users = self.db.check_users(usernames)
-        self.assertEquals(missing_users, ['missing'])
+        self.assertEquals(missing_users, set(['missing']))
 
     def test_store_revision_encryption(self):
         self.units.has_item.return_value = False

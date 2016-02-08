@@ -82,3 +82,12 @@ class TestDynamoDbLocks(unittest.TestCase):
 
         locked = self.locks.try_lock(LOCK_NAME, ttl=5)
         self.assertFalse(locked)
+
+    def test_get_owner_found(self):
+        owner, acquire_time = self.locks.get_owner(LOCK_NAME)
+        self.assertEquals(owner, INSTANCE_ID)
+
+    def test_get_owner_not_found(self):
+        self.lock_table.get_item.side_effect = ItemNotFound()
+        owner, acquire_time = self.locks.get_owner(LOCK_NAME)
+        self.assertEquals(owner, None)
