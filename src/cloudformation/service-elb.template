@@ -9,7 +9,7 @@
     },
     "FlotillaContainer": {
       "Type": "String",
-      "Default": "pwagner/flotilla",
+      "Default": "pebbletech/flotilla",
       "Description": "Flotilla container version to use."
     },
     "ServiceName": {

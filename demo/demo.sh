@@ -3,7 +3,7 @@
 AWS_CREDS="-v ${HOME}/.aws/credentials:/root/.aws/credentials "
 # -e AWS_ACCESS_KEY_ID= -e AWS_SECRET_ACCESS_KEY= would also work
 
-FLOTILLA="pwagner/flotilla"
+FLOTILLA="pebbletech/flotilla"
 REGIONS="-r us-east-1"
 # -r us-east-1 -r us-west-2 would also work
 
