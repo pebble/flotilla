@@ -1,6 +1,6 @@
 # Flotilla - The Petit Fleet
 
-[![Build Status](https://travis-ci.org/thepwagner/flotilla.svg?branch=master)](https://travis-ci.org/thepwagner/flotilla)
+[![Build Status](https://travis-ci.org/pebble/flotilla.svg?branch=master)](https://travis-ci.org/pebble/flotilla)
 
 Flotilla is an alternative to [fleet](https://github.com/coreos/fleet) that uncouples from CoreOS/etcd and couples to AWS.
 
