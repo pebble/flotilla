@@ -194,7 +194,8 @@ class FlotillaCloudFormation(object):
                     }
 
         service_stack = self._stack(region_name, name,
-                                    json.dumps(json_template), service_params)
+                                    json.dumps(json_template, indent=2),
+                                    service_params)
 
         stack_outputs = {o.key: o.value for o in
                          service_stack.outputs}
@@ -327,7 +328,7 @@ class FlotillaCloudFormation(object):
                     new_resources.append(region_resource)
                 statement['Resource'] = new_resources
 
-        return json.dumps(template_json)
+        return json.dumps(template_json, indent=2)
 
     def _stack(self, region, name, template, params):
         """
@@ -420,11 +421,17 @@ class FlotillaCloudFormation(object):
     @staticmethod
     def _complete(stack, expected_hash):
         if not stack:
+            logger.debug('Stack not defined.')
             return False
-        if stack.get('stack_hash') != expected_hash:
+        existing_hash = stack.get('stack_hash')
+        if existing_hash != expected_hash:
+            logger.debug('Stack exists but hash does not match: %s vs %s',
+                         existing_hash, expected_hash)
             # Exists but mismatch:
             return False
         elif not stack.get('outputs'):
+            logger.debug('Stack exists but is not complete.')
             # Exists but not finished:
             return False
+        logger.debug('Stack is completed.')
         return True
