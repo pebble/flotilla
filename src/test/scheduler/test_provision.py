@@ -61,7 +61,7 @@ class TestFlotillaProvisioner(unittest.TestCase):
         self.provisioner.provision()
 
         self.cloudformation.vpc.assert_called_with(ANY, ANY)
-        self.cloudformation.service.assert_called_with(REGION, self.service,
+        self.cloudformation.service.assert_called_with(ANY, self.service,
                                                        ANY, ANY)
         self.db.set_stacks.assert_called_with(ANY)
 
@@ -80,7 +80,7 @@ class TestFlotillaProvisioner(unittest.TestCase):
         self.provisioner.provision()
 
         self.cloudformation.vpc.assert_called_with(ANY, ANY)
-        self.cloudformation.service.assert_called_with(REGION, ANY, ANY, ANY)
+        self.cloudformation.service.assert_called_with(ANY, ANY, ANY, ANY)
         self.db.set_stacks.assert_called_with([])
 
     def test_provision_delete(self):

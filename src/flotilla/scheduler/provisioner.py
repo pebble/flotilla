@@ -63,7 +63,7 @@ class FlotillaProvisioner(object):
         for service_name, service_stack in service_stacks.items():
             service = services[service_name]
 
-            new_service_stack = self._cloudformation.service(self._region,
+            new_service_stack = self._cloudformation.service(region_item,
                                                              service,
                                                              region_outputs,
                                                              service_stack)

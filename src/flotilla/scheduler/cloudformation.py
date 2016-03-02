@@ -121,11 +121,12 @@ class FlotillaCloudFormation(object):
         :param vpc_outputs: VPC stack outputs.
         :return: CloudFormation Stack
         """
+        region_name = region['region_name']
         service_name = service['service_name']
         service_hash = self._service_hash(service, vpc_outputs)
         if self._complete(stack, service_hash):
             logger.debug('Service stack for %s complete in %s.', service_name,
-                         region)
+                         region_name)
             return None
 
         name = 'flotilla-{0}-worker-{1}'.format(self._environment, service_name)
@@ -192,19 +193,20 @@ class FlotillaCloudFormation(object):
                         }
                     }
 
-        service_stack = self._stack(region, name, json.dumps(json_template),
-                                    service_params)
+        service_stack = self._stack(region_name, name,
+                                    json.dumps(json_template), service_params)
 
         stack_outputs = {o.key: o.value for o in
                          service_stack.outputs}
         stack = {'stack_arn': service_stack.stack_id,
                  'service': service_name,
-                 'region': region,
+                 'region': region_name,
                  'outputs': stack_outputs,
                  'stack_hash': service_hash}
         return stack
 
     def _service_params(self, region, service, vpc_outputs):
+        region_name = region['region_name']
         service_name = service['service_name']
         params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
         params['FlotillaEnvironment'] = self._environment
@@ -231,8 +233,12 @@ class FlotillaCloudFormation(object):
             params['VirtualHost'] = generated_dns
         coreos_channel = service.get('coreos_channel', 'stable')
         coreos_version = service.get('coreos_version', 'current')
-        ami = self._coreos.get_ami(coreos_channel, coreos_version, region)
+        ami = self._coreos.get_ami(coreos_channel, coreos_version, region_name)
         params['Ami'] = ami
+
+        container = region.get('flotilla_container')
+        if container:
+            params['FlotillaContainer'] = container
         return params
 
     def tables(self, regions):
