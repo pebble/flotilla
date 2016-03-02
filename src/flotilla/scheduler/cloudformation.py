@@ -282,6 +282,10 @@ class FlotillaCloudFormation(object):
             for i in range(1, 4):
                 scheduler_params['Az%d' % i] = params['az%d' % i]
 
+            container = params.get('flotilla_container')
+            if container:
+                scheduler_params['FlotillaContainer'] = container
+
             if 'FlotillaRegion' not in scheduler_params:
                 scheduler_params['FlotillaRegion'] = region
 

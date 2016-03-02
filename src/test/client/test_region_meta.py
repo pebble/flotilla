@@ -11,6 +11,7 @@ REGION_OTHER = 'us-west-2'
 SCHEDULER = 't2.nano'
 CHANNEL = 'stable'
 VERSION = 'current'
+CONTAINER = 'pebbletech/flotilla'
 
 
 class TestRegionMetadata(unittest.TestCase):
@@ -56,9 +57,10 @@ class TestRegionMetadata(unittest.TestCase):
         mock_connect.return_value = dynamo
         self.region_meta._region_params = MagicMock(return_value={})
 
-        region_params = self.region_meta.store_regions((REGION, REGION_OTHER),
-                                                       False, SCHEDULER,
-                                                       CHANNEL, VERSION)
+        self.region_meta.store_regions((REGION, REGION_OTHER),
+                                       False, SCHEDULER,
+                                       CHANNEL, VERSION,
+                                       CONTAINER)
         self.assertEquals(mock_connect.call_count, 2)
 
     @patch('boto3.resource')
@@ -67,9 +69,9 @@ class TestRegionMetadata(unittest.TestCase):
         mock_connect.return_value = dynamo
         self.region_meta._region_params = MagicMock(return_value={})
 
-        region_params = self.region_meta.store_regions((REGION, REGION_OTHER),
-                                                       True, SCHEDULER,
-                                                       CHANNEL, VERSION)
+        self.region_meta.store_regions((REGION, REGION_OTHER),
+                                       True, SCHEDULER,
+                                       CHANNEL, VERSION, CONTAINER)
         self.assertEquals(mock_connect.call_count, 2)
 
     def mock_subnet_error(self, mock_connect, message):

@@ -11,7 +11,7 @@ class RegionMetadata(object):
         self._environment = environment
 
     def store_regions(self, regions, per_region, instance_type, coreos_channel,
-                      coreos_version):
+                      coreos_version, flotilla_container):
         region_params = {region: self._region_params(region)
                          for region in regions}
 
@@ -27,6 +27,7 @@ class RegionMetadata(object):
 
         region_updates = {}
         for region_name, region_param in region_params.items():
+            region_param['flotilla_container'] = flotilla_container
             region_updates[region_name] = {
                 k: {'Value': v, 'Action': 'PUT'}
                 for k, v in region_param.items()}
