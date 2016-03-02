@@ -99,7 +99,9 @@ class FlotillaCloudFormation(object):
         az2 = region.get('az2', '%sb' % region_name)
         az3 = region.get('az3', '%sc' % region_name)
 
-        return {
+        container = region.get('flotilla_container')
+
+        params = {
             'FlotillaEnvironment': self._environment,
             'NatInstanceType': nat_instance_type,
             'NatAmi': nat_ami,
@@ -107,6 +109,9 @@ class FlotillaCloudFormation(object):
             'Az2': az2,
             'Az3': az3
         }
+        if container:
+            params['FlotillaContainer'] = container
+        return params
 
     def service(self, region, service, vpc_outputs, stack):
         """

@@ -182,6 +182,12 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.assertEqual(params['Az1'], 'us-east-1a')
         self.assertEqual(params['Az2'], 'us-east-1b')
         self.assertEqual(params['Az3'], 'us-east-1c')
+        self.assertTrue('FlotillaContainer' not in params)
+
+    def test_vpc_params_container(self):
+        params = self.cf._vpc_params({'region_name': REGION,
+                                      'flotilla_container': 'pwagner/flotilla'})
+        self.assertEqual(params['FlotillaContainer'], 'pwagner/flotilla')
 
     def test_tables_done(self):
         self.mock_client()
