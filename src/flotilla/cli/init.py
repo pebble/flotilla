@@ -32,20 +32,24 @@ def init_cmd():  # pragma: no cover
               help='Scheduler CoreOS version.')
 @click.option('--available', is_flag=True,
               help='Launch scheduler in every region (or just the first).')
+@click.option('--flotilla-container', type=click.STRING,
+              envvar='FLOTILLA_CONTAINER', default=DEFAULT_FLOTILLA_CONTAINER,
+              help='Flotilla container (public, dockerhub)')
 def init(region, environment, domain, instance_type, coreos_channel,
-         coreos_version, available):  # pragma: no cover
+         coreos_version, available, flotilla_container):  # pragma: no cover
     bootstrap(region, environment, domain, instance_type, coreos_channel,
-              coreos_version, available)
+              coreos_version, available, flotilla_container)
 
 
 def bootstrap(region, environment, domain, instance_type, coreos_channel,
-              coreos_version, available):
+              coreos_version, available, flotilla_container):
     coreos = CoreOsAmiIndex()
     cloudformation = FlotillaCloudFormation(environment, domain, coreos)
     region_meta = RegionMetadata(environment)
     regions = [r for r in unique_everseen(region)]
     cloudformation.tables(regions)
     region_params = region_meta.store_regions(regions, available, instance_type,
-                                              coreos_channel, coreos_version)
+                                              coreos_channel, coreos_version,
+                                              flotilla_container)
     cloudformation.schedulers(region_params)
     logger.info('Bootstrap complete')

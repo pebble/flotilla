@@ -10,8 +10,9 @@ from flotilla.scheduler.coreos import CoreOsAmiIndex
 ENVIRONMENT = 'test'
 DOMAIN = 'test.com'
 NAME = 'service'
-REGION = 'us-east-1'
-REGIONS = (REGION, 'us-west-2')
+REGION_NAME = 'us-east-1'
+REGION = {'region_name': REGION_NAME}
+REGIONS = (REGION_NAME, 'us-west-2')
 STACK_ARN = 'stack_arn'
 TEMPLATE = '{}'
 SERVICE_STACK = 'flotilla-test-worker-service'
@@ -35,10 +36,10 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         mock_connect.return_value = self.cloudformation
         self.assertEqual(0, len(self.cf._clients))
 
-        self.cf._client(REGION)
+        self.cf._client(REGION_NAME)
 
         self.assertEqual(1, len(self.cf._clients))
-        self.assertEqual(self.cloudformation, self.cf._clients[REGION])
+        self.assertEqual(self.cloudformation, self.cf._clients[REGION_NAME])
 
     def test_service_hash(self):
         service_hash = self.cf._service_hash(self.service, {'foo': 'bar'})
@@ -71,7 +72,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cloudformation.describe_stacks.side_effect = not_found
         self.cloudformation.create_stack.return_value = STACK_ARN
 
-        stack = self.cf._stack(REGION, NAME, TEMPLATE, {})
+        stack = self.cf._stack(REGION_NAME, NAME, TEMPLATE, {})
 
         self.cloudformation.create_stack. \
             assert_called_with(NAME,
@@ -85,7 +86,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.mock_client()
         self.stack.stack_status = 'CREATE_IN_PROGRESS'
 
-        stack = self.cf._stack(REGION, NAME, '{}', {})
+        stack = self.cf._stack(REGION_NAME, NAME, '{}', {})
 
         self.assertEqual(stack.stack_status, 'CREATE_IN_PROGRESS')
         self.cloudformation.create_stack.assert_not_called()
@@ -95,7 +96,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.mock_client()
         self.cloudformation.update_stack.return_value = STACK_ARN
 
-        stack = self.cf._stack(REGION, NAME, TEMPLATE, {})
+        stack = self.cf._stack(REGION_NAME, NAME, TEMPLATE, {})
 
         self.cloudformation.create_stack.assert_not_called()
         self.cloudformation.update_stack. \
@@ -110,7 +111,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         unknown_error = BotoServerError(400, 'Unknown error')
         self.cloudformation.update_stack.side_effect = unknown_error
 
-        self.assertRaises(BotoServerError, self.cf._stack, REGION, NAME,
+        self.assertRaises(BotoServerError, self.cf._stack, REGION_NAME, NAME,
                           TEMPLATE, {})
 
     def test_stack_existing_update_noop(self):
@@ -120,7 +121,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
                                           ' performed.</Message>')
         self.cloudformation.update_stack.side_effect = no_updates
 
-        stack = self.cf._stack(REGION, NAME, TEMPLATE, {})
+        stack = self.cf._stack(REGION_NAME, NAME, TEMPLATE, {})
 
         self.assertEqual(stack, self.stack)
 
@@ -129,7 +130,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
 
         self.cf.service(REGION, self.service, {}, None)
 
-        self.cf._stack.assert_called_with(REGION, SERVICE_STACK, ANY, ANY)
+        self.cf._stack.assert_called_with(REGION_NAME, SERVICE_STACK, ANY, ANY)
 
     def test_service_complete(self):
         self.cf._complete = MagicMock(return_value=True)
@@ -142,7 +143,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
 
         self.cf.service(REGION, self.service, {}, None)
 
-        self.cf._stack.assert_called_with(REGION, SERVICE_STACK, ANY, ANY)
+        self.cf._stack.assert_called_with(REGION_NAME, SERVICE_STACK, ANY, ANY)
 
     def test_service_private_ports(self):
         self.cf._stack = MagicMock()
@@ -150,7 +151,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
 
         self.cf.service(REGION, self.service, {}, None)
 
-        self.cf._stack.assert_called_with(REGION, SERVICE_STACK, ANY, ANY)
+        self.cf._stack.assert_called_with(REGION_NAME, SERVICE_STACK, ANY, ANY)
 
     def test_service_params_generate_dns(self):
         stack_params = self.cf._service_params(REGION, self.service, {})
@@ -164,24 +165,36 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
         self.assertEqual(stack_params['VirtualHost'], 'testapp.test.com')
 
+    def test_service_params_custom_container(self):
+        region = REGION.copy()
+        region['flotilla_container'] = 'pwagner/flotilla'
+        stack_params = self.cf._service_params(region, self.service, {})
+        self.assertEqual(stack_params['FlotillaContainer'], 'pwagner/flotilla')
+
     def test_vpc(self):
         self.cf._stack = MagicMock()
 
-        self.cf.vpc({'region_name': REGION}, None)
+        self.cf.vpc({'region_name': REGION_NAME}, None)
 
-        self.cf._stack.assert_called_with(REGION, 'flotilla-test-vpc',
+        self.cf._stack.assert_called_with(REGION_NAME, 'flotilla-test-vpc',
                                           self.cf._template('vpc'), ANY)
 
     def test_vpc_complete(self):
         self.cf._complete = MagicMock(return_value=True)
-        vpc = self.cf.vpc({'region_name': REGION}, None)
+        vpc = self.cf.vpc({'region_name': REGION_NAME}, None)
         self.assertIsNone(vpc)
 
     def test_vpc_params_empty(self):
-        params = self.cf._vpc_params({'region_name': REGION})
+        params = self.cf._vpc_params({'region_name': REGION_NAME})
         self.assertEqual(params['Az1'], 'us-east-1a')
         self.assertEqual(params['Az2'], 'us-east-1b')
         self.assertEqual(params['Az3'], 'us-east-1c')
+        self.assertTrue('FlotillaContainer' not in params)
+
+    def test_vpc_params_container(self):
+        params = self.cf._vpc_params({'region_name': REGION_NAME,
+                                      'flotilla_container': 'pwagner/flotilla'})
+        self.assertEqual(params['FlotillaContainer'], 'pwagner/flotilla')
 
     def test_tables_done(self):
         self.mock_client()
@@ -210,7 +223,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.mock_client()
         self.cf._stack = MagicMock()
         regions = {
-            REGION: {
+            REGION_NAME: {
                 'scheduler': True,
                 'scheduler_instance_type': 't2.nano',
                 'scheduler_coreos_channel': 'stable',
@@ -218,12 +231,14 @@ class TestFlotillaCloudFormation(unittest.TestCase):
                 'az1': 'us-east-1a',
                 'az2': 'us-east-1b',
                 'az3': 'us-east-1c',
+                'flotilla_container': 'pwagner/flotilla'
             }
         }
 
         self.cf.schedulers(regions)
 
-        self.cf._stack.assert_called_with(REGION, 'flotilla-test-scheduler',
+        self.cf._stack.assert_called_with(REGION_NAME,
+                                          'flotilla-test-scheduler',
                                           self.cf._template('scheduler'), ANY)
 
     def test_schedulers_light(self):
@@ -231,7 +246,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf._stack = MagicMock()
         self.cf._scheduler_for_regions = MagicMock()
         regions = {
-            REGION: {
+            REGION_NAME: {
                 'scheduler': True,
                 'scheduler_instance_type': 't2.nano',
                 'scheduler_coreos_channel': 'stable',
@@ -246,7 +261,8 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf.schedulers(regions)
 
         self.cf._scheduler_for_regions.assert_called_with(ANY)
-        self.cf._stack.assert_called_with(REGION, 'flotilla-test-scheduler',
+        self.cf._stack.assert_called_with(REGION_NAME,
+                                          'flotilla-test-scheduler',
                                           ANY, ANY)
 
     def test_complete_missing(self):

@@ -8,6 +8,11 @@ from flotilla.cli.init import bootstrap
 REGIONS = ['us-east-1']
 ENVIRONMENT = 'develop'
 DOMAIN = 'test.com'
+AVAILABLE = False
+CONTAINER = 'pwagner/flotilla'
+INSTANCE_TYPE = 't2.nano'
+COREOS_CHANNEL = 'stable'
+COREOS_VERSION = 'current'
 
 
 class TestInit(unittest.TestCase):
@@ -19,11 +24,16 @@ class TestInit(unittest.TestCase):
         region.return_value = mock_region
         cloudformation.return_value = mock_cf
 
-        bootstrap(REGIONS, ENVIRONMENT, DOMAIN, 't2.nano', 'stable',
-                  'current', False)
+        bootstrap(REGIONS, ENVIRONMENT, DOMAIN, INSTANCE_TYPE, COREOS_CHANNEL,
+                  COREOS_VERSION, AVAILABLE, CONTAINER)
 
         region.assert_called_with(ENVIRONMENT)
-        mock_region.store_regions.assert_called_with(ANY, ANY, ANY, ANY, ANY)
+        mock_region.store_regions.assert_called_with(ANY,
+                                                     AVAILABLE,
+                                                     INSTANCE_TYPE,
+                                                     COREOS_CHANNEL,
+                                                     COREOS_VERSION,
+                                                     CONTAINER)
 
         cloudformation.assert_called_with(ENVIRONMENT, DOMAIN, ANY)
         mock_cf.tables.assert_called_with(REGIONS)

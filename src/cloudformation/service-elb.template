@@ -593,7 +593,7 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}]]},
+            "Value": {"Ref": "AWS::StackName"},
             "PropagateAtLaunch": true
           }
         ]

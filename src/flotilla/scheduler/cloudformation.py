@@ -99,7 +99,9 @@ class FlotillaCloudFormation(object):
         az2 = region.get('az2', '%sb' % region_name)
         az3 = region.get('az3', '%sc' % region_name)
 
-        return {
+        container = region.get('flotilla_container')
+
+        params = {
             'FlotillaEnvironment': self._environment,
             'NatInstanceType': nat_instance_type,
             'NatAmi': nat_ami,
@@ -107,6 +109,9 @@ class FlotillaCloudFormation(object):
             'Az2': az2,
             'Az3': az3
         }
+        if container:
+            params['FlotillaContainer'] = container
+        return params
 
     def service(self, region, service, vpc_outputs, stack):
         """
@@ -116,11 +121,12 @@ class FlotillaCloudFormation(object):
         :param vpc_outputs: VPC stack outputs.
         :return: CloudFormation Stack
         """
+        region_name = region['region_name']
         service_name = service['service_name']
         service_hash = self._service_hash(service, vpc_outputs)
         if self._complete(stack, service_hash):
             logger.debug('Service stack for %s complete in %s.', service_name,
-                         region)
+                         region_name)
             return None
 
         name = 'flotilla-{0}-worker-{1}'.format(self._environment, service_name)
@@ -187,19 +193,21 @@ class FlotillaCloudFormation(object):
                         }
                     }
 
-        service_stack = self._stack(region, name, json.dumps(json_template),
+        service_stack = self._stack(region_name, name,
+                                    json.dumps(json_template, indent=2),
                                     service_params)
 
         stack_outputs = {o.key: o.value for o in
                          service_stack.outputs}
         stack = {'stack_arn': service_stack.stack_id,
                  'service': service_name,
-                 'region': region,
+                 'region': region_name,
                  'outputs': stack_outputs,
                  'stack_hash': service_hash}
         return stack
 
     def _service_params(self, region, service, vpc_outputs):
+        region_name = region['region_name']
         service_name = service['service_name']
         params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
         params['FlotillaEnvironment'] = self._environment
@@ -226,8 +234,12 @@ class FlotillaCloudFormation(object):
             params['VirtualHost'] = generated_dns
         coreos_channel = service.get('coreos_channel', 'stable')
         coreos_version = service.get('coreos_version', 'current')
-        ami = self._coreos.get_ami(coreos_channel, coreos_version, region)
+        ami = self._coreos.get_ami(coreos_channel, coreos_version, region_name)
         params['Ami'] = ami
+
+        container = region.get('flotilla_container')
+        if container:
+            params['FlotillaContainer'] = container
         return params
 
     def tables(self, regions):
@@ -282,6 +294,10 @@ class FlotillaCloudFormation(object):
             for i in range(1, 4):
                 scheduler_params['Az%d' % i] = params['az%d' % i]
 
+            container = params.get('flotilla_container')
+            if container:
+                scheduler_params['FlotillaContainer'] = container
+
             if 'FlotillaRegion' not in scheduler_params:
                 scheduler_params['FlotillaRegion'] = region
 
@@ -312,7 +328,7 @@ class FlotillaCloudFormation(object):
                     new_resources.append(region_resource)
                 statement['Resource'] = new_resources
 
-        return json.dumps(template_json)
+        return json.dumps(template_json, indent=2)
 
     def _stack(self, region, name, template, params):
         """
@@ -405,11 +421,17 @@ class FlotillaCloudFormation(object):
     @staticmethod
     def _complete(stack, expected_hash):
         if not stack:
+            logger.debug('Stack not defined.')
             return False
-        if stack.get('stack_hash') != expected_hash:
+        existing_hash = stack.get('stack_hash')
+        if existing_hash != expected_hash:
+            logger.debug('Stack exists but hash does not match: %s vs %s',
+                         existing_hash, expected_hash)
             # Exists but mismatch:
             return False
         elif not stack.get('outputs'):
+            logger.debug('Stack exists but is not complete.')
             # Exists but not finished:
             return False
+        logger.debug('Stack is completed.')
         return True
