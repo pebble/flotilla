@@ -2,14 +2,14 @@
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "VPC for flotilla",
   "Parameters": {
-    "NatInstanceType": {
+    "BastionInstanceType": {
       "Type": "String",
       "Default": "t2.nano",
-      "Description": "Instance type for NAT instances."
+      "Description": "Instance type for bastion instances."
     },
-    "NatAmi": {
+    "BastionAmi": {
       "Type": "AWS::EC2::Image::Id",
-      "Description": "AMI for NAT instances."
+      "Description": "AMI for bastion instances."
     },
     "FlotillaEnvironment": {
       "Type": "String",
@@ -259,10 +259,10 @@
         "RouteTableId": {"Ref": "PrivateRouteTable"}
       }
     },
-    "NatSecurityGroup": {
+    "BastionSecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
-        "GroupDescription": "NAT Security Group",
+        "GroupDescription": "Bastion Security Group",
         "VpcId": {"Ref": "VPC"},
         "SecurityGroupIngress": [
           {
@@ -299,12 +299,12 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "nat"]]}
+            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "bastion"]]}
           }
         ]
       }
     },
-    "NatRole": {
+    "BastionRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
         "AssumeRolePolicyDocument": {
@@ -432,23 +432,23 @@
         "Path": "/"
       }
     },
-    "NatInstanceProfile": {
+    "BastionInstanceProfile": {
       "Type": "AWS::IAM::InstanceProfile",
       "Properties": {
         "Path": "/",
         "Roles": [
-          {"Ref": "NatRole"}
+          {"Ref": "BastionRole"}
         ]
       }
     },
-    "NatLC": {
+    "BastionLC": {
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
-        "InstanceType": {"Ref": "NatInstanceType"},
-        "ImageId": {"Ref": "NatAmi"},
-        "SecurityGroups": [{"Ref": "NatSecurityGroup"}],
+        "InstanceType": {"Ref": "BastionInstanceType"},
+        "ImageId": {"Ref": "BastionAmi"},
+        "SecurityGroups": [{"Ref": "BastionSecurityGroup"}],
         "AssociatePublicIpAddress": "true",
-        "IamInstanceProfile": {"Ref": "NatInstanceProfile"},
+        "IamInstanceProfile": {"Ref": "BastionInstanceProfile"},
         "UserData": {
           "Fn::Base64": {
             "Fn::Join": [
@@ -493,7 +493,7 @@
                 "      ChallengeResponseAuthentication no", "\n",
                 "      AuthorizedKeysCommand /bin/docker run --rm ",
                 {"Ref": "FlotillaContainer"}, " keys -r ",
-                {"Ref": "AWS::Region"}, "\n",
+                {"Ref": "AWS::Region"}, " --bastion\n",
                 "      AuthorizedKeysCommandUser _sshkeys", "\n",
                 "\n"
               ]
@@ -502,13 +502,13 @@
         }
       }
     },
-    "NatASG": {
+    "BastionASG": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
         "MinSize": 1,
         "MaxSize": 1,
         "DesiredCapacity": 1,
-        "LaunchConfigurationName": {"Ref": "NatLC"},
+        "LaunchConfigurationName": {"Ref": "BastionLC"},
         "VPCZoneIdentifier": [
           {"Ref": "PublicSubnet01"},
           {"Ref": "PublicSubnet02"},
@@ -517,7 +517,7 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "nat"]]},
+            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "bastion"]]},
             "PropagateAtLaunch": true
           }
         ]
@@ -546,8 +546,8 @@
     "PrivateSubnet03": {
       "Value": {"Ref": "PrivateSubnet03"}
     },
-    "NatSecurityGroup": {
-      "Value": {"Ref": "NatSecurityGroup"}
+    "BastionSecurityGroup": {
+      "Value": {"Ref": "BastionSecurityGroup"}
     }
   }
 }

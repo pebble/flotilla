@@ -28,7 +28,7 @@ class TestKeys(unittest.TestCase):
         db.return_value = self.db
         get_keys(ENVIRONMENT, REGION, None, True)
 
-        self.db.get_gateway_users.assert_called_with()
+        self.db.get_bastion_users.assert_called_with()
 
     @patch('flotilla.cli.keys.FlotillaSshDynamo')
     @patch('flotilla.cli.keys.DynamoDbTables')

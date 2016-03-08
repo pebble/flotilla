@@ -20,41 +20,41 @@ def region_cmd():  # pragma: no cover
 @click.option('--region', '-r', multiple=True, type=click.Choice(REGIONS),
               envvar='FLOTILLA_REGION',
               help='Regions (multiple allowed).')
-@click.option('--nat-instance-type', type=click.Choice(INSTANCE_TYPES),
-              help='NAT instance type.')
-@click.option('--nat-coreos-channel', type=click.Choice(COREOS_CHANNELS),
-              help='NAT instance CoreOS channel.')
-@click.option('--nat-coreos-version', type=click.STRING,
-              help='NAT instance CoreOS version.')
+@click.option('--bastion-instance-type', type=click.Choice(INSTANCE_TYPES),
+              help='Bastion instance type.')
+@click.option('--bastion-coreos-channel', type=click.Choice(COREOS_CHANNELS),
+              help='Bastion instance CoreOS channel.')
+@click.option('--bastion-coreos-version', type=click.STRING,
+              help='Bastion instance CoreOS version.')
 @click.option('--admin', type=click.STRING, multiple=True,
               help='Administrative user(s).')
-def region(environment, region, nat_instance_type, nat_coreos_channel,
-           nat_coreos_version, admin):  # pragma: no cover
-    configure_region(environment, region, nat_instance_type, nat_coreos_channel,
-                     nat_coreos_version, admin)
+def region(environment, region, bastion_instance_type, bastion_coreos_channel,
+           bastion_coreos_version, admin):  # pragma: no cover
+    configure_region(environment, region, bastion_instance_type,
+                     bastion_coreos_channel, bastion_coreos_version, admin)
 
 
 def get_updates(instance_type, coreos_channel, coreos_version, admins):
     updates = {}
     if instance_type:
-        updates['nat_instance_type'] = instance_type
+        updates['bastion_instance_type'] = instance_type
     if coreos_channel:
-        updates['nat_coreos_channel'] = coreos_channel
+        updates['bastion_coreos_channel'] = coreos_channel
     if coreos_version:
-        updates['nat_coreos_version'] = coreos_version
+        updates['bastion_coreos_version'] = coreos_version
     if len(admins) > 0:
         updates['admins'] = list(admins)
     return updates
 
 
-def configure_region(environment, regions, nat_instance_type,
-                     nat_coreos_channel, nat_coreos_version, admins):
+def configure_region(environment, regions, bastion_instance_type,
+                     bastion_coreos_channel, bastion_coreos_version, admins):
     if not regions:
         logger.warn('Must specify region(s) to update.')
         return
 
-    updates = get_updates(nat_instance_type, nat_coreos_channel,
-                          nat_coreos_version, admins)
+    updates = get_updates(bastion_instance_type, bastion_coreos_channel,
+                          bastion_coreos_version, admins)
 
     if not updates:
         logger.warn('No updates to do!')

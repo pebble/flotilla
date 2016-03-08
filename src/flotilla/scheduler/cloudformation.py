@@ -28,7 +28,7 @@ SERVICE_KEYS_ITERABLE = ('private_ports',
                          'public_ports',
                          'regions')
 
-FORWARD_FIELDS = ['VpcId', 'NatSecurityGroup']
+FORWARD_FIELDS = ['VpcId', 'BastionSecurityGroup']
 for subnet_index in range(1, 4):
     FORWARD_FIELDS.append('PublicSubnet0%d' % subnet_index)
     FORWARD_FIELDS.append('PrivateSubnet0%d' % subnet_index)
@@ -89,11 +89,11 @@ class FlotillaCloudFormation(object):
 
     def _vpc_params(self, region):
         region_name = region.get('region_name')
-        nat_coreos_channel = region.get('nat_coreos_channel', 'stable')
-        nat_coreos_version = region.get('nat_coreos_version', 'current')
-        nat_ami = self._coreos.get_ami(nat_coreos_channel, nat_coreos_version,
-                                       region_name)
-        nat_instance_type = region.get('nat_instance_type', 't2.nano')
+        bastion_coreos_channel = region.get('bastion_coreos_channel', 'stable')
+        bastion_coreos_version = region.get('bastion_coreos_version', 'current')
+        bastion_ami = self._coreos.get_ami(bastion_coreos_channel,
+                                           bastion_coreos_version, region_name)
+        bastion_instance_type = region.get('bastion_instance_type', 't2.nano')
 
         az1 = region.get('az1', '%sa' % region_name)
         az2 = region.get('az2', '%sb' % region_name)
@@ -103,8 +103,8 @@ class FlotillaCloudFormation(object):
 
         params = {
             'FlotillaEnvironment': self._environment,
-            'NatInstanceType': nat_instance_type,
-            'NatAmi': nat_ami,
+            'BastionInstanceType': bastion_instance_type,
+            'BastionAmi': bastion_ami,
             'Az1': az1,
             'Az2': az2,
             'Az3': az3
@@ -146,7 +146,7 @@ class FlotillaCloudFormation(object):
                 'IpProtocol': 'tcp',
                 'FromPort': 22,
                 'ToPort': 22,
-                'SourceSecurityGroupId': {'Ref': 'NatSecurityGroup'}
+                'SourceSecurityGroupId': {'Ref': 'BastionSecurityGroup'}
             }]
             for port, protocol in public_ports.items():
                 listeners.append({

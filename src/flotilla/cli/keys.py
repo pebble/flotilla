@@ -19,8 +19,8 @@ def keys_cmd():  # pragma: no cover
               envvar='FLOTILLA_REGION', default=DEFAULT_REGIONS[0],
               help='Regions (multiple allowed).')
 @click.option('--service', type=click.STRING, help='Service name')
-@click.option('--gateway', is_flag=True, default=False,
-              help='Gateway/NAT instance flag.')
+@click.option('--bastion', is_flag=True, default=False,
+              help='Bastion instance flag.')
 def keys(environment, region, service, gateway):  # pragma: no cover
     get_keys(environment, region, service, gateway)
 
@@ -34,7 +34,7 @@ def get_keys(environment, region, service, gateway):
     if service is not None:
         users = db.get_service_admins(service)
     elif gateway:
-        users = db.get_gateway_users()
+        users = db.get_bastion_users()
     else:
         users = db.get_region_admins()
 
