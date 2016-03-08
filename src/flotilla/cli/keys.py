@@ -21,11 +21,11 @@ def keys_cmd():  # pragma: no cover
 @click.option('--service', type=click.STRING, help='Service name')
 @click.option('--bastion', is_flag=True, default=False,
               help='Bastion instance flag.')
-def keys(environment, region, service, gateway):  # pragma: no cover
-    get_keys(environment, region, service, gateway)
+def keys(environment, region, service, bastion):  # pragma: no cover
+    get_keys(environment, region, service, bastion)
 
 
-def get_keys(environment, region, service, gateway):
+def get_keys(environment, region, service, bastion):
     dynamo = boto.dynamodb2.connect_to_region(region)
     tables = DynamoDbTables(dynamo, environment=environment)
     tables.setup(['regions', 'services', 'users'])
@@ -33,7 +33,7 @@ def get_keys(environment, region, service, gateway):
                            region)
     if service is not None:
         users = db.get_service_admins(service)
-    elif gateway:
+    elif bastion:
         users = db.get_bastion_users()
     else:
         users = db.get_region_admins()

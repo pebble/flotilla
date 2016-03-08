@@ -238,6 +238,14 @@
         ]
       }
     },
+    "PrivateRouteTableDefaultRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PrivateRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : { "Ref" : "NatGateway" }
+      }
+    },
     "PrivateSubnet01RouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
@@ -270,30 +278,6 @@
             "FromPort": "22",
             "ToPort": "22",
             "CidrIp": "0.0.0.0/0"
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": "80",
-            "ToPort": "80",
-            "CidrIp": "192.168.0.0/16"
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": "443",
-            "ToPort": "443",
-            "CidrIp": "192.168.0.0/16"
-          },
-          {
-            "IpProtocol": "udp",
-            "FromPort": "123",
-            "ToPort": "123",
-            "CidrIp": "192.168.0.0/16"
-          },
-          {
-            "IpProtocol": "icmp",
-            "FromPort": "8",
-            "ToPort": "-1",
-            "CidrIp": "192.168.0.0/16"
           }
         ],
         "Tags": [
@@ -328,15 +312,6 @@
                   "Action": [
                     "ec2:Describe*",
                     "autoscaling:Describe*"
-                  ],
-                  "Resource": "*"
-                },
-                {
-                  "Effect": "Allow",
-                  "Action": [
-                    "ec2:ModifyInstanceAttribute",
-                    "ec2:CreateRoute",
-                    "ec2:ReplaceRoute"
                   ],
                   "Resource": "*"
                 }
@@ -455,23 +430,6 @@
               "", [
                 "#cloud-config", "\n",
                 "\n",
-                "coreos:", "\n",
-                "  units:", "\n",
-                "    - name: nat-instance.service", "\n",
-                "      command: start", "\n",
-                "      content: |", "\n",
-                "        [Unit]", "\n",
-                "        Description=Enables NAT, updates routing table", "\n",
-                "        After=docker.service", "\n",
-                "        Requires=docker.service", "\n",
-                "        ", "\n",
-                "        [Service]", "\n",
-                "        Type=oneshot", "\n",
-                "        ExecStartPre=/usr/bin/docker pull pebbletech/ha-nat",
-                "\n",
-                "        ExecStart=/usr/bin/docker run --rm --privileged --net=host pebbletech/ha-nat",
-                "\n",
-                "\n",
                 "users:", "\n",
                 "  - name: _sshkeys", "\n",
                 "    homedir: /var/empty", "\n",
@@ -493,7 +451,9 @@
                 "      ChallengeResponseAuthentication no", "\n",
                 "      AuthorizedKeysCommand /bin/docker run --rm ",
                 {"Ref": "FlotillaContainer"}, " keys -r ",
-                {"Ref": "AWS::Region"}, " --bastion\n",
+                {"Ref": "AWS::Region"}, " --environment ",
+                {"Ref": "FlotillaEnvironment"},
+                " --bastion\n",
                 "      AuthorizedKeysCommandUser _sshkeys", "\n",
                 "\n"
               ]
@@ -522,6 +482,20 @@
           }
         ]
       }
+    },
+    "NatEip": {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : "vpc"
+      }
+    },
+    "NatGateway" : {
+      "DependsOn" : "AttachGateway",
+      "Type" : "AWS::EC2::NatGateway",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : ["NatEip", "AllocationId"]},
+        "SubnetId" : { "Ref" : "PublicSubnet01"}
+      }
     }
   },
   "Outputs": {
@@ -548,6 +522,9 @@
     },
     "BastionSecurityGroup": {
       "Value": {"Ref": "BastionSecurityGroup"}
+    },
+    "NatEip": {
+      "Value": {"Ref": "NatEip"}
     }
   }
 }

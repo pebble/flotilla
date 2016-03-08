@@ -562,7 +562,9 @@
                 "      ChallengeResponseAuthentication no", "\n",
                 "      AuthorizedKeysCommand /bin/docker run --rm ",
                 {"Ref": "FlotillaContainer"}, " keys -r ",
-                {"Ref": "AWS::Region"}, " --service ", {"Ref": "ServiceName"},
+                {"Ref": "AWS::Region"}, " --environment ",
+                {"Ref": "FlotillaEnvironment"},
+                " --service ", {"Ref": "ServiceName"},
                 "\n",
                 "      AuthorizedKeysCommandUser _sshkeys", "\n",
                 "\n"
