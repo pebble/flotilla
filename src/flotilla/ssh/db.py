@@ -30,7 +30,7 @@ class FlotillaSshDynamo(object):
         region_admins |= set(service_admins)
         return region_admins
 
-    def get_gateway_users(self):
+    def get_bastion_users(self):
         region_admins = self.get_region_admins()
 
         for service_item in self._services.scan(attributes=SERVICE_ATTRIBUTES,

@@ -58,8 +58,8 @@ class TestFlotillaSshDynamo(unittest.TestCase):
 
         self.assertEqual(users, set(REGION_ADMINS))
 
-    def test_get_gateway_users(self):
-        users = self.db.get_gateway_users()
+    def test_get_bastion_users(self):
+        users = self.db.get_bastion_users()
 
         self.assertEqual(users, set(REGION_ADMINS + SERVICE_ADMINS))
 

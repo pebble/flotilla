@@ -175,7 +175,7 @@ class FlotillaClientDynamo(object):
             region_item = self._regions.new_item(region)
         for key, value in updates.items():
             region_item[key] = value
-        region_item.save()
+        region_item.save(overwrite=True)
 
     def configure_service(self, service, updates):
         try:

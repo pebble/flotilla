@@ -9,25 +9,26 @@ REGIONS = ('us-east-1', 'us-west-2')
 INSTANCE_TYPE = 't2.nano'
 COREOS_CHANNEL = 'alpha'
 COREOS_VERSION = 'current'
+NAT_PER_AZ = None
 ADMINS = ['pwagner']
 
 
 class TestRegion(unittest.TestCase):
     def test_get_updates_noop(self):
-        updates = get_updates(None, None, None, ())
+        updates = get_updates(None, None, None, None, ())
         self.assertEquals(len(updates), 0)
 
     def test_get_updates_basic(self):
         updates = get_updates(INSTANCE_TYPE, COREOS_CHANNEL, COREOS_VERSION,
-                              ADMINS)
-        self.assertEquals(len(updates), 4)
+                              True, ADMINS)
+        self.assertEquals(len(updates), 5)
 
     @patch('flotilla.cli.region.FlotillaClientDynamo')
     @patch('flotilla.cli.region.DynamoDbTables')
     @patch('boto.dynamodb2.connect_to_region')
     def test_configure_region(self, dynamo, tables, db):
         configure_region(ENVIRONMENT, REGIONS, INSTANCE_TYPE, COREOS_CHANNEL,
-                         COREOS_VERSION, ADMINS)
+                         COREOS_VERSION, NAT_PER_AZ, ADMINS)
 
         self.assertEquals(dynamo.call_count, len(REGIONS))
 
@@ -40,7 +41,7 @@ class TestRegion(unittest.TestCase):
         db.return_value = mock_db
 
         configure_region(ENVIRONMENT, REGIONS, INSTANCE_TYPE, COREOS_CHANNEL,
-                         COREOS_VERSION, ADMINS)
+                         COREOS_VERSION, NAT_PER_AZ, ADMINS)
 
         self.assertEquals(dynamo.call_count, len(REGIONS))
         self.assertEqual(db.configure_region.call_count, 0)
@@ -48,10 +49,10 @@ class TestRegion(unittest.TestCase):
     @patch('boto.dynamodb2.connect_to_region')
     def test_configure_region_no_name(self, dynamo):
         configure_region(ENVIRONMENT, (), INSTANCE_TYPE, COREOS_CHANNEL,
-                         COREOS_VERSION, ADMINS)
+                         COREOS_VERSION, NAT_PER_AZ, ADMINS)
         self.assertEquals(dynamo.call_count, 0)
 
     @patch('boto.dynamodb2.connect_to_region')
     def test_configure_region_no_updates(self, dynamo):
-        configure_region(ENVIRONMENT, REGIONS, None, None, None, ())
+        configure_region(ENVIRONMENT, REGIONS, None, None, None, None, ())
         self.assertEquals(dynamo.call_count, 0)

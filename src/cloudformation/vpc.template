@@ -2,14 +2,14 @@
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "VPC for flotilla",
   "Parameters": {
-    "NatInstanceType": {
+    "BastionInstanceType": {
       "Type": "String",
       "Default": "t2.nano",
-      "Description": "Instance type for NAT instances."
+      "Description": "Instance type for bastion instances."
     },
-    "NatAmi": {
+    "BastionAmi": {
       "Type": "AWS::EC2::Image::Id",
-      "Description": "AMI for NAT instances."
+      "Description": "AMI for bastion instances."
     },
     "FlotillaEnvironment": {
       "Type": "String",
@@ -32,6 +32,20 @@
     "Az3": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
       "Description": "Third AZ."
+    },
+    "NatPerAz": {
+      "Description": "Create an NAT gateway in each AZ?",
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": ["true", "false"]
+    }
+  },
+  "Conditions": {
+    "MultiAzNat": {
+      "Fn::Equals": [
+        {"Ref": "NatPerAz"},
+        "true"
+      ]
     }
   },
   "Resources": {
@@ -127,7 +141,7 @@
           {
             "Key": "Name",
             "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "public"]]
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public0X"]]
             }
           }
         ]
@@ -222,7 +236,7 @@
         ]
       }
     },
-    "PrivateRouteTable": {
+    "PrivateRouteTable01": {
       "Type": "AWS::EC2::RouteTable",
       "Properties": {
         "VpcId": {"Ref": "VPC"},
@@ -232,8 +246,38 @@
           {
             "Key": "Name",
             "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "private"]]
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private01"]]
             }
+          }
+        ]
+      }
+    },
+    "PrivateRouteTable02": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "Tags": [
+          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
+          {"Key": "Network", "Value": "Private"},
+          {
+            "Key": "Name", "Value": {
+            "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private02"]]
+          }
+          }
+        ]
+      }
+    },
+    "PrivateRouteTable03": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "Tags": [
+          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
+          {"Key": "Network", "Value": "Private"},
+          {
+            "Key": "Name", "Value": {
+            "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private03"]]
+          }
           }
         ]
       }
@@ -242,27 +286,59 @@
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {"Ref": "PrivateSubnet01"},
-        "RouteTableId": {"Ref": "PrivateRouteTable"}
+        "RouteTableId": {"Ref": "PrivateRouteTable01"}
       }
     },
     "PrivateSubnet02RouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {"Ref": "PrivateSubnet02"},
-        "RouteTableId": {"Ref": "PrivateRouteTable"}
+        "RouteTableId": {"Ref": "PrivateRouteTable02"}
       }
     },
     "PrivateSubnet03RouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {"Ref": "PrivateSubnet03"},
-        "RouteTableId": {"Ref": "PrivateRouteTable"}
+        "RouteTableId": {"Ref": "PrivateRouteTable03"}
       }
     },
-    "NatSecurityGroup": {
+    "PrivateRouteTable01DefaultRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PrivateRouteTable01"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {"Ref": "NatGateway01"}
+      }
+    },
+    "PrivateRouteTable02DefaultRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PrivateRouteTable02"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Fn::If": [
+            "MultiAzNat", {"Ref": "NatGateway02"}, {"Ref": "NatGateway01"}
+          ]
+        }
+      }
+    },
+    "PrivateRouteTable03DefaultRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PrivateRouteTable03"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Fn::If": [
+            "MultiAzNat", {"Ref": "NatGateway03"}, {"Ref": "NatGateway01"}
+          ]
+        }
+      }
+    },
+    "BastionSecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
-        "GroupDescription": "NAT Security Group",
+        "GroupDescription": "Bastion Security Group",
         "VpcId": {"Ref": "VPC"},
         "SecurityGroupIngress": [
           {
@@ -270,41 +346,17 @@
             "FromPort": "22",
             "ToPort": "22",
             "CidrIp": "0.0.0.0/0"
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": "80",
-            "ToPort": "80",
-            "CidrIp": "192.168.0.0/16"
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": "443",
-            "ToPort": "443",
-            "CidrIp": "192.168.0.0/16"
-          },
-          {
-            "IpProtocol": "udp",
-            "FromPort": "123",
-            "ToPort": "123",
-            "CidrIp": "192.168.0.0/16"
-          },
-          {
-            "IpProtocol": "icmp",
-            "FromPort": "8",
-            "ToPort": "-1",
-            "CidrIp": "192.168.0.0/16"
           }
         ],
         "Tags": [
           {
             "Key": "Name",
-            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "nat"]]}
+            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "bastion"]]}
           }
         ]
       }
     },
-    "NatRole": {
+    "BastionRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
         "AssumeRolePolicyDocument": {
@@ -328,15 +380,6 @@
                   "Action": [
                     "ec2:Describe*",
                     "autoscaling:Describe*"
-                  ],
-                  "Resource": "*"
-                },
-                {
-                  "Effect": "Allow",
-                  "Action": [
-                    "ec2:ModifyInstanceAttribute",
-                    "ec2:CreateRoute",
-                    "ec2:ReplaceRoute"
                   ],
                   "Resource": "*"
                 }
@@ -432,45 +475,28 @@
         "Path": "/"
       }
     },
-    "NatInstanceProfile": {
+    "BastionInstanceProfile": {
       "Type": "AWS::IAM::InstanceProfile",
       "Properties": {
         "Path": "/",
         "Roles": [
-          {"Ref": "NatRole"}
+          {"Ref": "BastionRole"}
         ]
       }
     },
-    "NatLC": {
+    "BastionLC": {
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
-        "InstanceType": {"Ref": "NatInstanceType"},
-        "ImageId": {"Ref": "NatAmi"},
-        "SecurityGroups": [{"Ref": "NatSecurityGroup"}],
+        "InstanceType": {"Ref": "BastionInstanceType"},
+        "ImageId": {"Ref": "BastionAmi"},
+        "SecurityGroups": [{"Ref": "BastionSecurityGroup"}],
         "AssociatePublicIpAddress": "true",
-        "IamInstanceProfile": {"Ref": "NatInstanceProfile"},
+        "IamInstanceProfile": {"Ref": "BastionInstanceProfile"},
         "UserData": {
           "Fn::Base64": {
             "Fn::Join": [
               "", [
                 "#cloud-config", "\n",
-                "\n",
-                "coreos:", "\n",
-                "  units:", "\n",
-                "    - name: nat-instance.service", "\n",
-                "      command: start", "\n",
-                "      content: |", "\n",
-                "        [Unit]", "\n",
-                "        Description=Enables NAT, updates routing table", "\n",
-                "        After=docker.service", "\n",
-                "        Requires=docker.service", "\n",
-                "        ", "\n",
-                "        [Service]", "\n",
-                "        Type=oneshot", "\n",
-                "        ExecStartPre=/usr/bin/docker pull pebbletech/ha-nat",
-                "\n",
-                "        ExecStart=/usr/bin/docker run --rm --privileged --net=host pebbletech/ha-nat",
-                "\n",
                 "\n",
                 "users:", "\n",
                 "  - name: _sshkeys", "\n",
@@ -493,7 +519,9 @@
                 "      ChallengeResponseAuthentication no", "\n",
                 "      AuthorizedKeysCommand /bin/docker run --rm ",
                 {"Ref": "FlotillaContainer"}, " keys -r ",
-                {"Ref": "AWS::Region"}, "\n",
+                {"Ref": "AWS::Region"}, " --environment ",
+                {"Ref": "FlotillaEnvironment"},
+                " --bastion\n",
                 "      AuthorizedKeysCommandUser _sshkeys", "\n",
                 "\n"
               ]
@@ -502,13 +530,13 @@
         }
       }
     },
-    "NatASG": {
+    "BastionASG": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
         "MinSize": 1,
         "MaxSize": 1,
         "DesiredCapacity": 1,
-        "LaunchConfigurationName": {"Ref": "NatLC"},
+        "LaunchConfigurationName": {"Ref": "BastionLC"},
         "VPCZoneIdentifier": [
           {"Ref": "PublicSubnet01"},
           {"Ref": "PublicSubnet02"},
@@ -517,10 +545,58 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "nat"]]},
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "bastion"]]
+            },
             "PropagateAtLaunch": true
           }
         ]
+      }
+    },
+    "NatEip01": {
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+    "NatEip02": {
+      "Condition": "MultiAzNat",
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+    "NatEip03": {
+      "Condition": "MultiAzNat",
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+    "NatGateway01": {
+      "DependsOn": "AttachGateway",
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId": {"Fn::GetAtt": ["NatEip01", "AllocationId"]},
+        "SubnetId": {"Ref": "PublicSubnet01"}
+      }
+    },
+    "NatGateway02": {
+      "Condition": "MultiAzNat",
+      "DependsOn": "AttachGateway",
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId": {"Fn::GetAtt": ["NatEip02", "AllocationId"]},
+        "SubnetId": {"Ref": "PublicSubnet02"}
+      }
+    },
+    "NatGateway03": {
+      "Condition": "MultiAzNat",
+      "DependsOn": "AttachGateway",
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId": {"Fn::GetAtt": ["NatEip03", "AllocationId"]},
+        "SubnetId": {"Ref": "PublicSubnet03"}
       }
     }
   },
@@ -546,8 +622,17 @@
     "PrivateSubnet03": {
       "Value": {"Ref": "PrivateSubnet03"}
     },
-    "NatSecurityGroup": {
-      "Value": {"Ref": "NatSecurityGroup"}
+    "BastionSecurityGroup": {
+      "Value": {"Ref": "BastionSecurityGroup"}
+    },
+    "NatEip01": {
+      "Value": {"Ref": "NatEip01"}
+    },
+    "NatEip02": {
+      "Value": {"Fn::If": ["MultiAzNat", {"Ref": "NatEip02"}, ""]}
+    },
+    "NatEip03": {
+      "Value": {"Fn::If": ["MultiAzNat", {"Ref": "NatEip03"}, ""]}
     }
   }
 }

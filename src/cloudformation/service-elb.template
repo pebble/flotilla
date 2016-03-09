@@ -25,8 +25,8 @@
       "Type": "AWS::EC2::Image::Id",
       "Default": "ami-bf8477fb"
     },
-    "NatSecurityGroup": {
-      "Description": "Security group for NAT/gateway instances",
+    "BastionSecurityGroup": {
+      "Description": "Security group for bastion instances",
       "Type": "AWS::EC2::SecurityGroup::Id"
     },
     "InstanceType": {
@@ -127,7 +127,7 @@
             "IpProtocol": "tcp",
             "FromPort": "22",
             "ToPort": "22",
-            "SourceSecurityGroupId": {"Ref": "NatSecurityGroup"}
+            "SourceSecurityGroupId": {"Ref": "BastionSecurityGroup"}
           },
           {
             "IpProtocol": "tcp",
@@ -562,7 +562,9 @@
                 "      ChallengeResponseAuthentication no", "\n",
                 "      AuthorizedKeysCommand /bin/docker run --rm ",
                 {"Ref": "FlotillaContainer"}, " keys -r ",
-                {"Ref": "AWS::Region"}, " --service ", {"Ref": "ServiceName"},
+                {"Ref": "AWS::Region"}, " --environment ",
+                {"Ref": "FlotillaEnvironment"},
+                " --service ", {"Ref": "ServiceName"},
                 "\n",
                 "      AuthorizedKeysCommandUser _sshkeys", "\n",
                 "\n"
