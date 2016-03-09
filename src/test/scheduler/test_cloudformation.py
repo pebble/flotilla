@@ -196,6 +196,21 @@ class TestFlotillaCloudFormation(unittest.TestCase):
                                       'flotilla_container': 'pwagner/flotilla'})
         self.assertEqual(params['FlotillaContainer'], 'pwagner/flotilla')
 
+    def test_vpc_params_nat_per_az(self):
+        params = self.cf._vpc_params({'region_name': REGION_NAME,
+                                      'nat_per_az': 'true'})
+        self.assertEqual(params['NatPerAz'], 'true')
+
+    def test_vpc_params_nat_per_az(self):
+        params = self.cf._vpc_params({'region_name': REGION_NAME,
+                                      'nat_per_az': 'true'})
+        self.assertEqual(params['NatPerAz'], 'true')
+
+    def test_vpc_params_nat_per_az_invalid(self):
+        params = self.cf._vpc_params({'region_name': REGION_NAME,
+                                      'nat_per_az': 'meow'})
+        self.assertEqual(params['NatPerAz'], 'false')
+
     def test_tables_done(self):
         self.mock_client()
         self.cf._stack = MagicMock(return_value=self.stack)

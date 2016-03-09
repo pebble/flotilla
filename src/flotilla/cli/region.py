@@ -26,15 +26,19 @@ def region_cmd():  # pragma: no cover
               help='Bastion instance CoreOS channel.')
 @click.option('--bastion-coreos-version', type=click.STRING,
               help='Bastion instance CoreOS version.')
+@click.option('--nat-per-az/--no-nat-per-az', default=None,
+              help='Attach a NAT gateway in every AZ.')
 @click.option('--admin', type=click.STRING, multiple=True,
               help='Administrative user(s).')
 def region(environment, region, bastion_instance_type, bastion_coreos_channel,
-           bastion_coreos_version, admin):  # pragma: no cover
+           bastion_coreos_version, nat_per_az, admin):  # pragma: no cover
     configure_region(environment, region, bastion_instance_type,
-                     bastion_coreos_channel, bastion_coreos_version, admin)
+                     bastion_coreos_channel, bastion_coreos_version, nat_per_az,
+                     admin)
 
 
-def get_updates(instance_type, coreos_channel, coreos_version, admins):
+def get_updates(instance_type, coreos_channel, coreos_version, nat_per_az,
+                admins):
     updates = {}
     if instance_type:
         updates['bastion_instance_type'] = instance_type
@@ -42,19 +46,22 @@ def get_updates(instance_type, coreos_channel, coreos_version, admins):
         updates['bastion_coreos_channel'] = coreos_channel
     if coreos_version:
         updates['bastion_coreos_version'] = coreos_version
+    if nat_per_az is not None:
+        updates['nat_per_az'] = nat_per_az and 'true' or 'false'
     if len(admins) > 0:
         updates['admins'] = list(admins)
     return updates
 
 
 def configure_region(environment, regions, bastion_instance_type,
-                     bastion_coreos_channel, bastion_coreos_version, admins):
+                     bastion_coreos_channel, bastion_coreos_version, nat_per_az,
+                     admins):
     if not regions:
         logger.warn('Must specify region(s) to update.')
         return
 
     updates = get_updates(bastion_instance_type, bastion_coreos_channel,
-                          bastion_coreos_version, admins)
+                          bastion_coreos_version, nat_per_az, admins)
 
     if not updates:
         logger.warn('No updates to do!')

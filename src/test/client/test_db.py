@@ -139,7 +139,7 @@ class TestFlotillaClientDynamo(unittest.TestCase):
         existing_region = MagicMock(spec=Item)
         self.regions.get_item.return_value = existing_region
         self.db.configure_region('us-east-1', {'az1': 'us-east-1a'})
-        existing_region.save.assert_called_with()
+        existing_region.save.assert_called_with(overwrite=True)
 
     def test_configure_service_create(self):
         self.services.get_item.side_effect = ItemNotFound()

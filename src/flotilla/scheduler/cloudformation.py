@@ -99,8 +99,6 @@ class FlotillaCloudFormation(object):
         az2 = region.get('az2', '%sb' % region_name)
         az3 = region.get('az3', '%sc' % region_name)
 
-        container = region.get('flotilla_container')
-
         params = {
             'FlotillaEnvironment': self._environment,
             'BastionInstanceType': bastion_instance_type,
@@ -109,8 +107,15 @@ class FlotillaCloudFormation(object):
             'Az2': az2,
             'Az3': az3
         }
+
+        container = region.get('flotilla_container')
         if container:
             params['FlotillaContainer'] = container
+
+        nat_per_az = region.get('nat_per_az', 'false')
+        if nat_per_az not in ('true', 'false'):
+            nat_per_az = 'false'
+        params['NatPerAz'] = nat_per_az
         return params
 
     def service(self, region, service, vpc_outputs, stack):

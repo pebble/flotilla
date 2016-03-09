@@ -32,6 +32,20 @@
     "Az3": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
       "Description": "Third AZ."
+    },
+    "NatPerAz": {
+      "Description": "Create an NAT gateway in each AZ?",
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": ["true", "false"]
+    }
+  },
+  "Conditions": {
+    "MultiAzNat": {
+      "Fn::Equals": [
+        {"Ref": "NatPerAz"},
+        "true"
+      ]
     }
   },
   "Resources": {
@@ -127,7 +141,7 @@
           {
             "Key": "Name",
             "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "public"]]
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public0X"]]
             }
           }
         ]
@@ -222,7 +236,7 @@
         ]
       }
     },
-    "PrivateRouteTable": {
+    "PrivateRouteTable01": {
       "Type": "AWS::EC2::RouteTable",
       "Properties": {
         "VpcId": {"Ref": "VPC"},
@@ -232,39 +246,93 @@
           {
             "Key": "Name",
             "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "private"]]
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private01"]]
             }
           }
         ]
       }
     },
-    "PrivateRouteTableDefaultRoute" : {
-      "Type" : "AWS::EC2::Route",
-      "Properties" : {
-        "RouteTableId" : { "Ref" : "PrivateRouteTable" },
-        "DestinationCidrBlock" : "0.0.0.0/0",
-        "NatGatewayId" : { "Ref" : "NatGateway" }
+    "PrivateRouteTable02": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "Tags": [
+          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
+          {"Key": "Network", "Value": "Private"},
+          {
+            "Key": "Name", "Value": {
+            "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private02"]]
+          }
+          }
+        ]
+      }
+    },
+    "PrivateRouteTable03": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {"Ref": "VPC"},
+        "Tags": [
+          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
+          {"Key": "Network", "Value": "Private"},
+          {
+            "Key": "Name", "Value": {
+            "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private03"]]
+          }
+          }
+        ]
       }
     },
     "PrivateSubnet01RouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {"Ref": "PrivateSubnet01"},
-        "RouteTableId": {"Ref": "PrivateRouteTable"}
+        "RouteTableId": {"Ref": "PrivateRouteTable01"}
       }
     },
     "PrivateSubnet02RouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {"Ref": "PrivateSubnet02"},
-        "RouteTableId": {"Ref": "PrivateRouteTable"}
+        "RouteTableId": {"Ref": "PrivateRouteTable02"}
       }
     },
     "PrivateSubnet03RouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {"Ref": "PrivateSubnet03"},
-        "RouteTableId": {"Ref": "PrivateRouteTable"}
+        "RouteTableId": {"Ref": "PrivateRouteTable03"}
+      }
+    },
+    "PrivateRouteTable01DefaultRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PrivateRouteTable01"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {"Ref": "NatGateway01"}
+      }
+    },
+    "PrivateRouteTable02DefaultRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PrivateRouteTable02"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Fn::If": [
+            "MultiAzNat", {"Ref": "NatGateway02"}, {"Ref": "NatGateway01"}
+          ]
+        }
+      }
+    },
+    "PrivateRouteTable03DefaultRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "PrivateRouteTable03"},
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Fn::If": [
+            "MultiAzNat", {"Ref": "NatGateway03"}, {"Ref": "NatGateway01"}
+          ]
+        }
       }
     },
     "BastionSecurityGroup": {
@@ -477,24 +545,58 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": {"Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "bastion"]]},
+            "Value": {
+              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "bastion"]]
+            },
             "PropagateAtLaunch": true
           }
         ]
       }
     },
-    "NatEip": {
-      "Type" : "AWS::EC2::EIP",
-      "Properties" : {
-        "Domain" : "vpc"
+    "NatEip01": {
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
       }
     },
-    "NatGateway" : {
-      "DependsOn" : "AttachGateway",
-      "Type" : "AWS::EC2::NatGateway",
-      "Properties" : {
-        "AllocationId" : { "Fn::GetAtt" : ["NatEip", "AllocationId"]},
-        "SubnetId" : { "Ref" : "PublicSubnet01"}
+    "NatEip02": {
+      "Condition": "MultiAzNat",
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+    "NatEip03": {
+      "Condition": "MultiAzNat",
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+    "NatGateway01": {
+      "DependsOn": "AttachGateway",
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId": {"Fn::GetAtt": ["NatEip01", "AllocationId"]},
+        "SubnetId": {"Ref": "PublicSubnet01"}
+      }
+    },
+    "NatGateway02": {
+      "Condition": "MultiAzNat",
+      "DependsOn": "AttachGateway",
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId": {"Fn::GetAtt": ["NatEip02", "AllocationId"]},
+        "SubnetId": {"Ref": "PublicSubnet02"}
+      }
+    },
+    "NatGateway03": {
+      "Condition": "MultiAzNat",
+      "DependsOn": "AttachGateway",
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId": {"Fn::GetAtt": ["NatEip03", "AllocationId"]},
+        "SubnetId": {"Ref": "PublicSubnet03"}
       }
     }
   },
@@ -523,8 +625,14 @@
     "BastionSecurityGroup": {
       "Value": {"Ref": "BastionSecurityGroup"}
     },
-    "NatEip": {
-      "Value": {"Ref": "NatEip"}
+    "NatEip01": {
+      "Value": {"Ref": "NatEip01"}
+    },
+    "NatEip02": {
+      "Value": {"Fn::If": ["MultiAzNat", {"Ref": "NatEip02"}, ""]}
+    },
+    "NatEip03": {
+      "Value": {"Fn::If": ["MultiAzNat", {"Ref": "NatEip03"}, ""]}
     }
   }
 }
