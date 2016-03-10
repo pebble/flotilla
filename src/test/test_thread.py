@@ -40,7 +40,7 @@ class TestRepeatingFunc(unittest.TestCase):
         time.sleep(0.01)
         f.stop()
         f.join()
-        assert instant_function.call_count > 20
+        assert instant_function.call_count > 10
 
     def run_loop(self, instant_function):
         f = RepeatingFunc('test', instant_function, 0.01)
