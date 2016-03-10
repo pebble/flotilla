@@ -30,6 +30,7 @@ class TestRegionMetadata(unittest.TestCase):
         self.assertEqual(region_item['az1'], 'us-east-1a')
         self.assertEqual(region_item['az2'], 'us-east-1c')
         self.assertEqual(region_item['az3'], 'us-east-1d')
+        self.assertEqual(region_item['az4'], 'us-east-1e')
 
     @patch('boto3.client')
     def test_region_params_wrap(self, mock_connect):
@@ -41,7 +42,7 @@ class TestRegionMetadata(unittest.TestCase):
         region_item = self.region_meta._region_params(REGION)
         self.assertEqual(region_item['az1'], 'us-east-1a')
         self.assertEqual(region_item['az2'], 'us-east-1c')
-        self.assertEqual(region_item['az3'], 'us-east-1a')
+        self.assertNotIn('az3', region_item)
 
     @patch('boto3.client')
     def test__region_params_exception(self, mock_connect):

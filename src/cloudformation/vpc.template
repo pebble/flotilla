@@ -21,17 +21,9 @@
       "Default": "pebbletech/flotilla",
       "Description": "Flotilla container version to use."
     },
-    "Az1": {
+    "Az01": {
       "Type": "AWS::EC2::AvailabilityZone::Name",
       "Description": "First AZ."
-    },
-    "Az2": {
-      "Type": "AWS::EC2::AvailabilityZone::Name",
-      "Description": "Second AZ."
-    },
-    "Az3": {
-      "Type": "AWS::EC2::AvailabilityZone::Name",
-      "Description": "Third AZ."
     },
     "NatPerAz": {
       "Description": "Create an NAT gateway in each AZ?",
@@ -88,44 +80,12 @@
       "Properties": {
         "VpcId": {"Ref": "VPC"},
         "CidrBlock": "192.168.1.0/24",
-        "AvailabilityZone": {"Ref": "Az1"},
+        "AvailabilityZone": {"Ref": "Az01"},
         "Tags": [
           {
             "Key": "Name",
             "Value": {
               "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public01"]]
-            }
-          }
-        ]
-      }
-    },
-    "PublicSubnet02": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "VpcId": {"Ref": "VPC"},
-        "CidrBlock": "192.168.2.0/24",
-        "AvailabilityZone": {"Ref": "Az2"},
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public02"]]
-            }
-          }
-        ]
-      }
-    },
-    "PublicSubnet03": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "VpcId": {"Ref": "VPC"},
-        "CidrBlock": "192.168.3.0/24",
-        "AvailabilityZone": {"Ref": "Az3"},
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Public03"]]
             }
           }
         ]
@@ -162,71 +122,17 @@
         "RouteTableId": {"Ref": "PublicRouteTable"}
       }
     },
-    "PublicSubnet02RouteTableAssociation": {
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-      "Properties": {
-        "SubnetId": {"Ref": "PublicSubnet02"},
-        "RouteTableId": {"Ref": "PublicRouteTable"}
-      }
-    },
-    "PublicSubnet03RouteTableAssociation": {
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-      "Properties": {
-        "SubnetId": {"Ref": "PublicSubnet03"},
-        "RouteTableId": {"Ref": "PublicRouteTable"}
-      }
-    },
     "PrivateSubnet01": {
       "Type": "AWS::EC2::Subnet",
       "Properties": {
         "VpcId": {"Ref": "VPC"},
         "CidrBlock": "192.168.101.0/24",
-        "AvailabilityZone": {"Ref": "Az1"},
+        "AvailabilityZone": {"Ref": "Az01"},
         "Tags": [
           {
             "Key": "Name",
             "Value": {
               "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private01"]]
-            }
-          },
-          {
-            "Key": "Network",
-            "Value": "Private"
-          }
-        ]
-      }
-    },
-    "PrivateSubnet02": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "VpcId": {"Ref": "VPC"},
-        "CidrBlock": "192.168.102.0/24",
-        "AvailabilityZone": {"Ref": "Az2"},
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private02"]]
-            }
-          },
-          {
-            "Key": "Network",
-            "Value": "Private"
-          }
-        ]
-      }
-    },
-    "PrivateSubnet03": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "VpcId": {"Ref": "VPC"},
-        "CidrBlock": "192.168.103.0/24",
-        "AvailabilityZone": {"Ref": "Az3"},
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": {
-              "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private03"]]
             }
           },
           {
@@ -252,55 +158,11 @@
         ]
       }
     },
-    "PrivateRouteTable02": {
-      "Type": "AWS::EC2::RouteTable",
-      "Properties": {
-        "VpcId": {"Ref": "VPC"},
-        "Tags": [
-          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
-          {"Key": "Network", "Value": "Private"},
-          {
-            "Key": "Name", "Value": {
-            "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private02"]]
-          }
-          }
-        ]
-      }
-    },
-    "PrivateRouteTable03": {
-      "Type": "AWS::EC2::RouteTable",
-      "Properties": {
-        "VpcId": {"Ref": "VPC"},
-        "Tags": [
-          {"Key": "Application", "Value": {"Ref": "AWS::StackName"}},
-          {"Key": "Network", "Value": "Private"},
-          {
-            "Key": "Name", "Value": {
-            "Fn::Join": ["-", [{"Ref": "AWS::StackName"}, "Private03"]]
-          }
-          }
-        ]
-      }
-    },
     "PrivateSubnet01RouteTableAssociation": {
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
       "Properties": {
         "SubnetId": {"Ref": "PrivateSubnet01"},
         "RouteTableId": {"Ref": "PrivateRouteTable01"}
-      }
-    },
-    "PrivateSubnet02RouteTableAssociation": {
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-      "Properties": {
-        "SubnetId": {"Ref": "PrivateSubnet02"},
-        "RouteTableId": {"Ref": "PrivateRouteTable02"}
-      }
-    },
-    "PrivateSubnet03RouteTableAssociation": {
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-      "Properties": {
-        "SubnetId": {"Ref": "PrivateSubnet03"},
-        "RouteTableId": {"Ref": "PrivateRouteTable03"}
       }
     },
     "PrivateRouteTable01DefaultRoute": {
@@ -309,30 +171,6 @@
         "RouteTableId": {"Ref": "PrivateRouteTable01"},
         "DestinationCidrBlock": "0.0.0.0/0",
         "NatGatewayId": {"Ref": "NatGateway01"}
-      }
-    },
-    "PrivateRouteTable02DefaultRoute": {
-      "Type": "AWS::EC2::Route",
-      "Properties": {
-        "RouteTableId": {"Ref": "PrivateRouteTable02"},
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "NatGatewayId": {
-          "Fn::If": [
-            "MultiAzNat", {"Ref": "NatGateway02"}, {"Ref": "NatGateway01"}
-          ]
-        }
-      }
-    },
-    "PrivateRouteTable03DefaultRoute": {
-      "Type": "AWS::EC2::Route",
-      "Properties": {
-        "RouteTableId": {"Ref": "PrivateRouteTable03"},
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "NatGatewayId": {
-          "Fn::If": [
-            "MultiAzNat", {"Ref": "NatGateway03"}, {"Ref": "NatGateway01"}
-          ]
-        }
       }
     },
     "BastionSecurityGroup": {
@@ -538,9 +376,7 @@
         "DesiredCapacity": 1,
         "LaunchConfigurationName": {"Ref": "BastionLC"},
         "VPCZoneIdentifier": [
-          {"Ref": "PublicSubnet01"},
-          {"Ref": "PublicSubnet02"},
-          {"Ref": "PublicSubnet03"}
+          {"Ref": "PublicSubnet01"}
         ],
         "Tags": [
           {
@@ -559,44 +395,12 @@
         "Domain": "vpc"
       }
     },
-    "NatEip02": {
-      "Condition": "MultiAzNat",
-      "Type": "AWS::EC2::EIP",
-      "Properties": {
-        "Domain": "vpc"
-      }
-    },
-    "NatEip03": {
-      "Condition": "MultiAzNat",
-      "Type": "AWS::EC2::EIP",
-      "Properties": {
-        "Domain": "vpc"
-      }
-    },
     "NatGateway01": {
       "DependsOn": "AttachGateway",
       "Type": "AWS::EC2::NatGateway",
       "Properties": {
         "AllocationId": {"Fn::GetAtt": ["NatEip01", "AllocationId"]},
         "SubnetId": {"Ref": "PublicSubnet01"}
-      }
-    },
-    "NatGateway02": {
-      "Condition": "MultiAzNat",
-      "DependsOn": "AttachGateway",
-      "Type": "AWS::EC2::NatGateway",
-      "Properties": {
-        "AllocationId": {"Fn::GetAtt": ["NatEip02", "AllocationId"]},
-        "SubnetId": {"Ref": "PublicSubnet02"}
-      }
-    },
-    "NatGateway03": {
-      "Condition": "MultiAzNat",
-      "DependsOn": "AttachGateway",
-      "Type": "AWS::EC2::NatGateway",
-      "Properties": {
-        "AllocationId": {"Fn::GetAtt": ["NatEip03", "AllocationId"]},
-        "SubnetId": {"Ref": "PublicSubnet03"}
       }
     }
   },
@@ -607,32 +411,14 @@
     "PublicSubnet01": {
       "Value": {"Ref": "PublicSubnet01"}
     },
-    "PublicSubnet02": {
-      "Value": {"Ref": "PublicSubnet02"}
-    },
-    "PublicSubnet03": {
-      "Value": {"Ref": "PublicSubnet03"}
-    },
     "PrivateSubnet01": {
       "Value": {"Ref": "PrivateSubnet01"}
-    },
-    "PrivateSubnet02": {
-      "Value": {"Ref": "PrivateSubnet02"}
-    },
-    "PrivateSubnet03": {
-      "Value": {"Ref": "PrivateSubnet03"}
     },
     "BastionSecurityGroup": {
       "Value": {"Ref": "BastionSecurityGroup"}
     },
     "NatEip01": {
       "Value": {"Ref": "NatEip01"}
-    },
-    "NatEip02": {
-      "Value": {"Fn::If": ["MultiAzNat", {"Ref": "NatEip02"}, ""]}
-    },
-    "NatEip03": {
-      "Value": {"Fn::If": ["MultiAzNat", {"Ref": "NatEip03"}, ""]}
     }
   }
 }
