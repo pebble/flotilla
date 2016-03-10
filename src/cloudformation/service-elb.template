@@ -60,25 +60,9 @@
       "Type": "AWS::EC2::Subnet::Id",
       "Description": "First private subnet."
     },
-    "PrivateSubnet02": {
-      "Type": "AWS::EC2::Subnet::Id",
-      "Description": "Second private subnet."
-    },
-    "PrivateSubnet03": {
-      "Type": "AWS::EC2::Subnet::Id",
-      "Description": "Third private subnet."
-    },
     "PublicSubnet01": {
       "Type": "AWS::EC2::Subnet::Id",
       "Description": "First public subnet."
-    },
-    "PublicSubnet02": {
-      "Type": "AWS::EC2::Subnet::Id",
-      "Description": "Second public subnet."
-    },
-    "PublicSubnet03": {
-      "Type": "AWS::EC2::Subnet::Id",
-      "Description": "Third public subnet."
     },
     "VirtualHost": {
       "Type": "String",
@@ -584,9 +568,7 @@
         "HealthCheckGracePeriod": "600",
         "HealthCheckType": "ELB",
         "VPCZoneIdentifier": [
-          {"Ref": "PrivateSubnet01"},
-          {"Ref": "PrivateSubnet02"},
-          {"Ref": "PrivateSubnet03"}
+          {"Ref": "PrivateSubnet01"}
         ],
         "LaunchConfigurationName": {"Ref": "Lc"},
         "LoadBalancerNames": [
@@ -611,20 +593,6 @@
               "ElbPublic",
               {"Ref": "PublicSubnet01"},
               {"Ref": "PrivateSubnet01"}
-            ]
-          },
-          {
-            "Fn::If": [
-              "ElbPublic",
-              {"Ref": "PublicSubnet02"},
-              {"Ref": "PrivateSubnet02"}
-            ]
-          },
-          {
-            "Fn::If": [
-              "ElbPublic",
-              {"Ref": "PublicSubnet03"},
-              {"Ref": "PrivateSubnet03"}
             ]
           }
         ],

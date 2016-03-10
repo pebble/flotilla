@@ -32,6 +32,33 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf = FlotillaCloudFormation(ENVIRONMENT, DOMAIN, self.coreos,
                                          backoff=0.001)
 
+        self.service_template = {
+            'Parameters': {
+                'PublicSubnet01': {
+                },
+                'PrivateSubnet01': {
+                }
+            },
+            'Resources': {
+                'PublicSubnet01': {
+                },
+                'PrivateSubnet01': {
+                },
+                'Elb': {
+                    'Properties': {
+                        'Subnets': [
+                        ]
+                    }
+                },
+                'Asg': {
+                    'Properties': {
+                        'VPCZoneIdentifier': [
+                        ]
+                    }
+                }
+            }
+        }
+
     @patch('boto.cloudformation.connect_to_region')
     def test_client_cache(self, mock_connect):
         mock_connect.return_value = self.cloudformation
@@ -155,22 +182,34 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf._stack.assert_called_with(REGION_NAME, SERVICE_STACK, ANY, ANY)
 
     def test_service_params_generate_dns(self):
-        stack_params = self.cf._service_params(REGION, self.service, {})
+        stack_params = self.cf._service_params(REGION, self.service, {},
+                                               self.service_template)
         self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
         self.assertEqual(stack_params['VirtualHost'], 'service-test.test.com')
 
     def test_service_params_dns_parameter(self):
         self.service['dns_name'] = 'testapp.test.com'
 
-        stack_params = self.cf._service_params(REGION, self.service, {})
+        stack_params = self.cf._service_params(REGION, self.service, {},
+                                               self.service_template)
         self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
         self.assertEqual(stack_params['VirtualHost'], 'testapp.test.com')
 
     def test_service_params_custom_container(self):
         region = REGION.copy()
         region['flotilla_container'] = 'pwagner/flotilla'
-        stack_params = self.cf._service_params(region, self.service, {})
+        stack_params = self.cf._service_params(region, self.service, {},
+                                               self.service_template)
         self.assertEqual(stack_params['FlotillaContainer'], 'pwagner/flotilla')
+
+    def test_service_params_subnets(self):
+        self.cf._service_params(REGION, self.service, {
+            'PrivateSubnet01': 'subnet-123456',
+            'PrivateSubnet02': 'subnet-654321',
+            'PublicSubnet01': 'subnet-234561',
+            'PublicSubnet02': 'subnet-165432',
+        }, self.service_template)
+        self.assertEqual(4, len(self.service_template['Parameters']))
 
     def test_vpc(self):
         self.cf._stack = MagicMock()

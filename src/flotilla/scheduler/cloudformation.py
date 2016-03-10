@@ -28,10 +28,7 @@ SERVICE_KEYS_ITERABLE = ('private_ports',
                          'public_ports',
                          'regions')
 
-FORWARD_FIELDS = ['VpcId', 'BastionSecurityGroup']
-for subnet_index in range(1, 4):
-    FORWARD_FIELDS.append('PublicSubnet0%d' % subnet_index)
-    FORWARD_FIELDS.append('PrivateSubnet0%d' % subnet_index)
+FORWARD_FIELDS = ('VpcId', 'BastionSecurityGroup')
 
 CAPABILITIES = ('CAPABILITY_IAM',)
 
@@ -259,7 +256,11 @@ class FlotillaCloudFormation(object):
         """
         region_name = region['region_name']
         service_name = service['service_name']
-        service_hash = self._service_hash(service, vpc_outputs)
+        template = self._template('service-elb')
+        json_template = json.loads(template)
+        service_params = self._service_params(region, service, vpc_outputs,
+                                              json_template)
+        service_hash = self._service_hash(service, service_params)
         if self._complete(stack, service_hash):
             logger.debug('Service stack for %s complete in %s.', service_name,
                          region_name)
@@ -267,10 +268,6 @@ class FlotillaCloudFormation(object):
 
         name = 'flotilla-{0}-worker-{1}'.format(self._environment, service_name)
 
-        service_params = self._service_params(region, service, vpc_outputs)
-        template = self._template('service-elb')
-
-        json_template = json.loads(template)
         resources = json_template['Resources']
 
         # Public ports are exposed to ELB, as a listener by ELB:
@@ -342,10 +339,43 @@ class FlotillaCloudFormation(object):
                  'stack_hash': service_hash}
         return stack
 
-    def _service_params(self, region, service, vpc_outputs):
+    def _service_params(self, region, service, vpc_outputs, json_template):
         region_name = region['region_name']
         service_name = service['service_name']
+
         params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
+        parameters = json_template['Parameters']
+        public_subnet_param = parameters['PublicSubnet01']
+        private_subnet_param = parameters['PrivateSubnet01']
+
+        resources = json_template['Resources']
+        elb_subnets = resources['Elb']['Properties']['Subnets']
+        asg_subnets = resources['Asg']['Properties']['VPCZoneIdentifier']
+
+        for k, v in vpc_outputs.items():
+            if k.endswith('Subnet01'):
+                # Initial subnet is forwarded without updating template:
+                params[k] = v
+                continue
+            if k.startswith('PublicSubnet'):
+                # Public subnets are parameters, and registered to ELB:
+                parameters[k] = deepcopy(public_subnet_param)
+                parameters[k]['Description'] = 'Generated AZ parameter.'
+                params[k] = v
+                elb_subnets.append({
+                    'Fn::If': [
+                        'ElbPublic',
+                        {'Ref': k},
+                        {'Ref': k.replace('Public', 'Private')}
+                    ]
+                })
+            elif k.startswith('PrivateSubnet'):
+                # Public subnets are parameters, and registered to ASG:
+                parameters[k] = deepcopy(private_subnet_param)
+                parameters[k]['Description'] = 'Generated AZ parameter.'
+                params[k] = v
+                asg_subnets.append({'Ref': k})
+
         params['FlotillaEnvironment'] = self._environment
         params['ServiceName'] = service_name
         # FIXME: HA by default, don't be cheap
