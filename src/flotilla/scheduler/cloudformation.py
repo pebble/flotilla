@@ -28,10 +28,7 @@ SERVICE_KEYS_ITERABLE = ('private_ports',
                          'public_ports',
                          'regions')
 
-FORWARD_FIELDS = ['VpcId', 'BastionSecurityGroup']
-for subnet_index in range(1, 4):
-    FORWARD_FIELDS.append('PublicSubnet0%d' % subnet_index)
-    FORWARD_FIELDS.append('PrivateSubnet0%d' % subnet_index)
+FORWARD_FIELDS = ('VpcId', 'BastionSecurityGroup')
 
 CAPABILITIES = ('CAPABILITY_IAM',)
 
@@ -80,12 +77,145 @@ class FlotillaCloudFormation(object):
             return None
         stack_name = 'flotilla-{0}-vpc'.format(self._environment)
 
+        template = self._setup_azs(stack_params, template)
+
         new_stack = self._stack(region_name, stack_name, template, stack_params)
-        stack_outputs = {o.key: o.value for o in new_stack.outputs}
+        stack_outputs = {o.key: o.value for o in new_stack.outputs if o.value}
         return {'stack_arn': new_stack.stack_id,
                 'region': region_name,
                 'outputs': stack_outputs,
                 'stack_hash': stack_hash}
+
+    def _setup_azs(self, stack_params, template):
+        azs = sorted([k for k in stack_params.keys() if k.startswith('Az')])
+
+        json_template = json.loads(template)
+        parameters = json_template['Parameters']
+        resources = json_template['Resources']
+        outputs = json_template['Outputs']
+
+        az_param = parameters['Az01']
+
+        public_subnet = resources['PublicSubnet01']
+        public_rta = resources['PublicSubnet01RouteTableAssociation']
+
+        private_subnet = resources['PrivateSubnet01']
+        private_rt = resources['PrivateRouteTable01']
+        private_default_route = resources['PrivateRouteTable01DefaultRoute']
+        private_rta = resources['PrivateSubnet01RouteTableAssociation']
+
+        nat_gateway = resources['NatGateway01']
+        nat_eip = resources['NatEip01']
+
+        bastion_asg_props = resources['BastionASG']['Properties']
+        bastion_asg_subnets = bastion_asg_props['VPCZoneIdentifier']
+
+        for secondary_az in azs[1:]:
+            az_index = int(secondary_az[2:])
+
+            # Each AZ should be declared as a parameter:
+            parameters[secondary_az] = deepcopy(az_param)
+            parameters[secondary_az]['Description'] = 'Generated AZ parameter.'
+
+            # Each AZ gets a public subnet:
+            public_subnet_resource = 'PublicSubnet%02d' % az_index
+            resources[public_subnet_resource] = self._clone_subnet(
+                    public_subnet,
+                    '192.168.%d.0/24' % az_index,
+                    'Public%02d' % az_index,
+                    secondary_az)
+            outputs[public_subnet_resource] = {
+                'Value': {'Ref': public_subnet_resource}
+            }
+
+            # Public subnets are available for Bastion hosts:
+            bastion_asg_subnets.append({'Ref': public_subnet_resource})
+
+            # Each public subnet is associated with the public route table:
+            public_rta_clone = deepcopy(public_rta)
+            public_rta_props = public_rta_clone['Properties']
+            public_rta_props['SubnetId']['Ref'] = public_subnet_resource
+            public_rta_resource = 'PublicSubnet%02dRouteTableAssociation' % \
+                                  az_index
+            resources[public_rta_resource] = public_rta_clone
+
+            # Each AZ gets a private subnet:
+            private_subnet_resource = 'PrivateSubnet%02d' % az_index
+            resources[private_subnet_resource] = self._clone_subnet(
+                    private_subnet,
+                    '192.168.%d.0/24' % (az_index + 100),
+                    'Private%02d' % az_index,
+                    secondary_az)
+            outputs[private_subnet_resource] = {
+                'Value': {'Ref': private_subnet_resource}
+            }
+
+            # Each AZ gets a private route table:
+            private_rt_clone = deepcopy(private_rt)
+            private_rt_name = self._get_name_tag(private_rt_clone['Properties'])
+            private_rt_name['Fn::Join'][1][1] = 'Private%02d' % az_index
+            private_rt_resource = 'PrivateRouteTable%02d' % az_index
+            resources[private_rt_resource] = private_rt_clone
+
+            # Associate private subnet to route table:
+            private_rta_clone = deepcopy(private_rta)
+            private_rta_props = private_rta_clone['Properties']
+            private_rta_props['SubnetId']['Ref'] = private_subnet_resource
+            private_rta_props['RouteTableId']['Ref'] = private_rt_resource
+            private_rta_resource = 'PrivateSubnet%02dRouteTableAssociation' % \
+                                   az_index
+            resources[private_rta_resource] = private_rta_clone
+
+            # Each AZ _can_ have an ElasticIP for NAT:
+            nat_eip_clone = deepcopy(nat_eip)
+            nat_eip_clone['Condition'] = 'MultiAzNat'
+            nat_eip_resource = 'NatEip%02d' % az_index
+            resources[nat_eip_resource] = nat_eip_clone
+            outputs[nat_eip_resource] = {
+                'Value': {'Fn::If': ['MultiAzNat',
+                                     {'Ref': nat_eip_resource}, '']}
+            }
+
+            # Each AZ _can_ have a NAT gateway:
+            nat_gateway_clone = deepcopy(nat_gateway)
+            nat_gateway_clone['Condition'] = 'MultiAzNat'
+            nat_gateway_props = nat_gateway_clone['Properties']
+            nat_gateway_props['SubnetId']['Ref'] = public_subnet_resource
+            nat_gateway_props['AllocationId']['Fn::GetAtt'][0] = \
+                nat_eip_resource
+            nat_gateway_resource = 'NatGateway%02d' % az_index
+            resources[nat_gateway_resource] = nat_gateway_clone
+
+            # Each private route table has a default NAT route:
+            private_default_route_clone = deepcopy(private_default_route)
+            private_route_props = private_default_route_clone['Properties']
+            private_route_props['RouteTableId']['Ref'] = private_rt_resource
+            private_route_props['NatGatewayId'] = {
+                'Fn::If': [
+                    'MultiAzNat', {'Ref': nat_gateway_resource},
+                    {'Ref': 'NatGateway01'}
+                ]
+            }
+            private_route_resource = 'PrivateRouteTable%02dDefaultRoute' % \
+                                     az_index
+            resources[private_route_resource] = private_default_route_clone
+
+        return json.dumps(json_template, indent=2)
+
+    def _clone_subnet(self, existing_subnet, cidr, label, az):
+        subnet_clone = deepcopy(existing_subnet)
+        subnet_props = subnet_clone['Properties']
+        subnet_props['CidrBlock'] = cidr
+        subnet_props['AvailabilityZone']['Ref'] = az
+        subnet_name = self._get_name_tag(subnet_props)
+        subnet_name['Fn::Join'][1][1] = label
+        return subnet_clone
+
+    @staticmethod
+    def _get_name_tag(resource_props):
+        name_tag = (t for t in resource_props['Tags']
+                    if t['Key'] == 'Name').next()
+        return name_tag['Value']
 
     def _vpc_params(self, region):
         region_name = region.get('region_name')
@@ -95,18 +225,16 @@ class FlotillaCloudFormation(object):
                                            bastion_coreos_version, region_name)
         bastion_instance_type = region.get('bastion_instance_type', 't2.nano')
 
-        az1 = region.get('az1', '%sa' % region_name)
-        az2 = region.get('az2', '%sb' % region_name)
-        az3 = region.get('az3', '%sc' % region_name)
-
         params = {
             'FlotillaEnvironment': self._environment,
             'BastionInstanceType': bastion_instance_type,
-            'BastionAmi': bastion_ami,
-            'Az1': az1,
-            'Az2': az2,
-            'Az3': az3
+            'BastionAmi': bastion_ami
         }
+        az_index = 1
+        for key, value in region.items():
+            if key.startswith('az'):
+                params['Az%02d' % az_index] = value
+                az_index += 1
 
         container = region.get('flotilla_container')
         if container:
@@ -128,7 +256,11 @@ class FlotillaCloudFormation(object):
         """
         region_name = region['region_name']
         service_name = service['service_name']
-        service_hash = self._service_hash(service, vpc_outputs)
+        template = self._template('service-elb')
+        json_template = json.loads(template)
+        service_params = self._service_params(region, service, vpc_outputs,
+                                              json_template)
+        service_hash = self._service_hash(service, service_params)
         if self._complete(stack, service_hash):
             logger.debug('Service stack for %s complete in %s.', service_name,
                          region_name)
@@ -136,10 +268,6 @@ class FlotillaCloudFormation(object):
 
         name = 'flotilla-{0}-worker-{1}'.format(self._environment, service_name)
 
-        service_params = self._service_params(region, service, vpc_outputs)
-        template = self._template('service-elb')
-
-        json_template = json.loads(template)
         resources = json_template['Resources']
 
         # Public ports are exposed to ELB, as a listener by ELB:
@@ -203,7 +331,7 @@ class FlotillaCloudFormation(object):
                                     service_params)
 
         stack_outputs = {o.key: o.value for o in
-                         service_stack.outputs}
+                         service_stack.outputs if o.value}
         stack = {'stack_arn': service_stack.stack_id,
                  'service': service_name,
                  'region': region_name,
@@ -211,10 +339,43 @@ class FlotillaCloudFormation(object):
                  'stack_hash': service_hash}
         return stack
 
-    def _service_params(self, region, service, vpc_outputs):
+    def _service_params(self, region, service, vpc_outputs, json_template):
         region_name = region['region_name']
         service_name = service['service_name']
+
         params = {k: vpc_outputs.get(k) for k in FORWARD_FIELDS}
+        parameters = json_template['Parameters']
+        public_subnet_param = parameters['PublicSubnet01']
+        private_subnet_param = parameters['PrivateSubnet01']
+
+        resources = json_template['Resources']
+        elb_subnets = resources['Elb']['Properties']['Subnets']
+        asg_subnets = resources['Asg']['Properties']['VPCZoneIdentifier']
+
+        for k, v in vpc_outputs.items():
+            if k.endswith('Subnet01'):
+                # Initial subnet is forwarded without updating template:
+                params[k] = v
+                continue
+            if k.startswith('PublicSubnet'):
+                # Public subnets are parameters, and registered to ELB:
+                parameters[k] = deepcopy(public_subnet_param)
+                parameters[k]['Description'] = 'Generated AZ parameter.'
+                params[k] = v
+                elb_subnets.append({
+                    'Fn::If': [
+                        'ElbPublic',
+                        {'Ref': k},
+                        {'Ref': k.replace('Public', 'Private')}
+                    ]
+                })
+            elif k.startswith('PrivateSubnet'):
+                # Public subnets are parameters, and registered to ASG:
+                parameters[k] = deepcopy(private_subnet_param)
+                parameters[k]['Description'] = 'Generated AZ parameter.'
+                params[k] = v
+                asg_subnets.append({'Ref': k})
+
         params['FlotillaEnvironment'] = self._environment
         params['ServiceName'] = service_name
         # FIXME: HA by default, don't be cheap

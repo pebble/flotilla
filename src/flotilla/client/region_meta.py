@@ -65,7 +65,7 @@ class RegionMetadata(object):
             message_split = message.split(region)
             # Invalid region is echoed back, every mention after that is an AZ:
             azs = sorted([s[0] for s in message_split[2:]])
-            for az_index in range(3):
-                az = az_index % len(azs)
-                region_params['az%d' % (az_index + 1)] = region + azs[az]
+            for index, az in enumerate(azs):
+                region_params['az%d' % (index + 1)] = region + az
+
         return region_params

@@ -1,4 +1,5 @@
 import unittest
+import json
 from mock import MagicMock, patch, ANY
 from boto.exception import BotoServerError
 from boto.cloudformation.connection import CloudFormationConnection
@@ -30,6 +31,33 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         }
         self.cf = FlotillaCloudFormation(ENVIRONMENT, DOMAIN, self.coreos,
                                          backoff=0.001)
+
+        self.service_template = {
+            'Parameters': {
+                'PublicSubnet01': {
+                },
+                'PrivateSubnet01': {
+                }
+            },
+            'Resources': {
+                'PublicSubnet01': {
+                },
+                'PrivateSubnet01': {
+                },
+                'Elb': {
+                    'Properties': {
+                        'Subnets': [
+                        ]
+                    }
+                },
+                'Asg': {
+                    'Properties': {
+                        'VPCZoneIdentifier': [
+                        ]
+                    }
+                }
+            }
+        }
 
     @patch('boto.cloudformation.connect_to_region')
     def test_client_cache(self, mock_connect):
@@ -154,22 +182,34 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf._stack.assert_called_with(REGION_NAME, SERVICE_STACK, ANY, ANY)
 
     def test_service_params_generate_dns(self):
-        stack_params = self.cf._service_params(REGION, self.service, {})
+        stack_params = self.cf._service_params(REGION, self.service, {},
+                                               self.service_template)
         self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
         self.assertEqual(stack_params['VirtualHost'], 'service-test.test.com')
 
     def test_service_params_dns_parameter(self):
         self.service['dns_name'] = 'testapp.test.com'
 
-        stack_params = self.cf._service_params(REGION, self.service, {})
+        stack_params = self.cf._service_params(REGION, self.service, {},
+                                               self.service_template)
         self.assertEqual(stack_params['VirtualHostDomain'], DOMAIN + '.')
         self.assertEqual(stack_params['VirtualHost'], 'testapp.test.com')
 
     def test_service_params_custom_container(self):
         region = REGION.copy()
         region['flotilla_container'] = 'pwagner/flotilla'
-        stack_params = self.cf._service_params(region, self.service, {})
+        stack_params = self.cf._service_params(region, self.service, {},
+                                               self.service_template)
         self.assertEqual(stack_params['FlotillaContainer'], 'pwagner/flotilla')
+
+    def test_service_params_subnets(self):
+        self.cf._service_params(REGION, self.service, {
+            'PrivateSubnet01': 'subnet-123456',
+            'PrivateSubnet02': 'subnet-654321',
+            'PublicSubnet01': 'subnet-234561',
+            'PublicSubnet02': 'subnet-165432',
+        }, self.service_template)
+        self.assertEqual(4, len(self.service_template['Parameters']))
 
     def test_vpc(self):
         self.cf._stack = MagicMock()
@@ -177,7 +217,7 @@ class TestFlotillaCloudFormation(unittest.TestCase):
         self.cf.vpc({'region_name': REGION_NAME}, None)
 
         self.cf._stack.assert_called_with(REGION_NAME, 'flotilla-test-vpc',
-                                          self.cf._template('vpc'), ANY)
+                                          ANY, ANY)
 
     def test_vpc_complete(self):
         self.cf._complete = MagicMock(return_value=True)
@@ -186,9 +226,10 @@ class TestFlotillaCloudFormation(unittest.TestCase):
 
     def test_vpc_params_empty(self):
         params = self.cf._vpc_params({'region_name': REGION_NAME})
-        self.assertEqual(params['Az1'], 'us-east-1a')
-        self.assertEqual(params['Az2'], 'us-east-1b')
-        self.assertEqual(params['Az3'], 'us-east-1c')
+        self.assertEquals(params['FlotillaEnvironment'], ENVIRONMENT)
+        self.assertEquals(params['BastionInstanceType'], 't2.nano')
+        self.assertIn('BastionAmi', params)
+
         self.assertTrue('FlotillaContainer' not in params)
 
     def test_vpc_params_container(self):
@@ -196,10 +237,12 @@ class TestFlotillaCloudFormation(unittest.TestCase):
                                       'flotilla_container': 'pwagner/flotilla'})
         self.assertEqual(params['FlotillaContainer'], 'pwagner/flotilla')
 
-    def test_vpc_params_nat_per_az(self):
+    def test_vpc_params_az(self):
         params = self.cf._vpc_params({'region_name': REGION_NAME,
-                                      'nat_per_az': 'true'})
-        self.assertEqual(params['NatPerAz'], 'true')
+                                      'az1': 'us-east-1a',
+                                      'az2': 'us-east-1b'})
+        self.assertEqual(params['Az01'], 'us-east-1a')
+        self.assertEqual(params['Az02'], 'us-east-1b')
 
     def test_vpc_params_nat_per_az(self):
         params = self.cf._vpc_params({'region_name': REGION_NAME,
@@ -294,6 +337,38 @@ class TestFlotillaCloudFormation(unittest.TestCase):
     def test_complete(self):
         stack = {'stack_hash': 'foo', 'outputs': {'foo': 'bar'}}
         self.assertTrue(self.cf._complete(stack, 'foo'))
+
+    def test_setup_azs_single(self):
+        template = self._run_setup_azs(Az01='us-east-1a')
+        self.assertNotIn('Az2', template['Parameters'])
+        self.assertNotIn('Az02', template['Parameters'])
+
+    def test_setup_azs_double(self):
+        template = self._run_setup_azs(Az01='us-east-1a', Az02='us-east-1b')
+        self.assertIn('Az02', template['Parameters'])
+
+    def test_setup_azs_variable(self):
+        double_template = self._run_setup_azs(Az01='us-east-1a',
+                                              Az02='us-east-1b')
+        double_resources = len(double_template['Resources'])
+
+        triple_template = self._run_setup_azs(Az01='us-east-1a',
+                                              Az02='us-east-1b',
+                                              Az03='us-east-1c')
+        triple_resources = len(triple_template['Resources'])
+
+        # With a duplicate AZ (but unique indexes: 1 and 4)
+        quad_template = self._run_setup_azs(Az01='us-east-1a',
+                                            Az02='us-east-1b',
+                                            Az03='us-east-1c',
+                                            Az04='us-east-1a')
+        quad_resources = len(quad_template['Resources'])
+        self.assertEquals(triple_resources - double_resources,
+                          quad_resources - triple_resources)
+
+    def _run_setup_azs(self, **kwargs):
+        template = self.cf._setup_azs(kwargs, self.cf._template('vpc'))
+        return json.loads(template)
 
     def mock_client(self):
         self.cf._client = MagicMock(return_value=self.cloudformation)
