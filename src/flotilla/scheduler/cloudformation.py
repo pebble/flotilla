@@ -286,7 +286,7 @@ class FlotillaCloudFormation(object):
                     'InstancePort': port,
                     'LoadBalancerPort': port,
                     'Protocol': protocol,
-                    'InstanceProtocol': "HTTP"
+                    'InstanceProtocol': protocol
                 })
                 # TODO: support proto=HTTPS
 
