@@ -3,8 +3,6 @@ import time
 
 logger = logging.getLogger('flotilla')
 
-SERVICE_EXPIRY = 10
-
 
 class ServiceDoctor(object):
     def __init__(self, db, elb):
@@ -19,35 +17,61 @@ class ServiceDoctor(object):
         :param instance:  Failing instance.
         :return: None.
         """
+        service_item = self._get_service_with_rev(service, rev)
+        if not service_item or service_item[rev] < 0:
+            # Invalid service/rev
+            return
+
+        healthy = self._healthy_instances_with_rev(service_item, rev, instance)
+        if not healthy:
+            logger.info('Diagnosis: %s is broken.', rev)
+            service_item[rev] *= -1
+            self._db.set_services([service_item])
+        else:
+            logger.info('Diagnosis: %s is broken.', instance)
+
+    def is_healthy_revision(self, service, rev):
+        """
+        Determine if a service revision is healthy.
+        :param service: Service name.
+        :param rev:  Revision hash.
+        :return: True if service has a healthy instance running this rev.
+        """
+        service_item = self._get_service_with_rev(service, rev)
+        if not service_item:
+            return False
+
+        if service_item[rev] < 0:
+            raise ValueError('Service has been marked as failed!')
+
+        return self._healthy_instances_with_rev(service_item, rev, None)
+
+    def _get_service_with_rev(self, service, rev):
         service_item = self._db.get_service(service)
         if not service_item:
             logger.warn('Service %s not found.', service)
-            return
-        if rev not in service_item or service_item[rev] < 0:
+            return None
+        if rev not in service_item:
             logger.warn('Service %s does not have revision %s.', service, rev)
-            return
+            return None
 
-        logger.info('Diagnosing error of %s in %s on %s...', rev, service,
-                    instance)
+        return service_item
 
+    def _healthy_instances_with_rev(self, service_item, rev, instance):
         # Are there any instances that _did_ load the service:
-        running = self._running_instances(service, instance, rev)
+        running = self._running_instances(service_item['service_name'], rev,
+                                          instance)
         logger.info('Found %s running instances.', len(running))
-        if running:
-            logger.debug('Found %d running instances, verifying ELB health...',
-                         len(running))
-
-            # TODO: not so ELB-centric:
-            healthy = self._healthy_instances(service_item, running)
-            logger.info('Found %s healthy instances.', len(healthy))
-
-            if healthy:
-                logger.info('Diagnosis: %s is broken.', instance)
-                return
-
-        logger.info('Diagnosis: %s is broken.', rev)
-        service_item[rev] *= -1
-        self._db.set_services([service_item])
+        if not running:
+            return False
+        logger.debug('Found %d running instances, verifying ELB health...',
+                     len(running))
+        # TODO: not so ELB-centric:
+        healthy = self._healthy_instances(service_item, running)
+        logger.info('Found %s healthy instances.', len(healthy))
+        if not healthy:
+            return False
+        return True
 
     def _running_instances(self, service, rev, instance):
         """
@@ -58,14 +82,11 @@ class ServiceDoctor(object):
         :return: Running instances.
         """
         running_instances = set()
-
-        active_cutoff = time.time() - SERVICE_EXPIRY
         service_statuses = self._db.get_service_status(service, rev, instance)
         for instance, services_status in service_statuses:
             for status in services_status.values():
                 sub_state = status['sub_state']
-                active_time = status['active_enter_time']
-                if sub_state == 'running' and active_time <= active_cutoff:
+                if sub_state == 'running':
                     running_instances.add(instance)
 
         return running_instances

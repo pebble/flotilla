@@ -4,7 +4,7 @@ from mock import MagicMock, ANY
 import time
 
 from flotilla.scheduler.db import FlotillaSchedulerDynamo
-from flotilla.scheduler.doctor import ServiceDoctor, SERVICE_EXPIRY
+from flotilla.scheduler.doctor import ServiceDoctor
 
 SERVICE = 'testapp'
 REV = '0000000000000000'
@@ -72,11 +72,26 @@ class TestServiceDoctor(unittest.TestCase):
         healthy = self.doctor._healthy_instances(self.service, [INSTANCE])
         self.assertEquals(healthy, set())
 
+    def test_is_healthy_revision_not_found(self):
+        self.doctor._get_service_with_rev = MagicMock(return_value=None)
+        healthy = self.doctor.is_healthy_revision(SERVICE, REV)
+        self.assertEqual(healthy, False)
+
+    def test_is_healthy_revision_not_healthy(self):
+        self._mock_service_status()
+        self.doctor._healthy_instances_with_rev = MagicMock(return_value=False)
+        healthy = self.doctor.is_healthy_revision(SERVICE, REV)
+        self.assertEqual(healthy, False)
+
+    def test_is_healthy_revision_hard_fail(self):
+        self.service[REV] = -1
+        self.assertRaises(ValueError, self.doctor.is_healthy_revision, SERVICE,
+                          REV)
+
     def _mock_service_status(self):
         self.db.get_service_status.return_value = {
             'i-654321': {
                 'service-foo': {
-                    'active_enter_time': time.time() - SERVICE_EXPIRY,
                     'sub_state': 'running'
                 }
             }
