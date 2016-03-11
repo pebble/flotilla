@@ -6,7 +6,7 @@ logger = logging.getLogger('flotilla')
 
 class ServiceDoctor(object):
     def __init__(self, db, elb):
-        self._db = db
+        self.db = db
         self._elb = elb
 
     def failed_revision(self, service, rev, instance):
@@ -26,7 +26,7 @@ class ServiceDoctor(object):
         if not healthy:
             logger.info('Diagnosis: %s is broken.', rev)
             service_item[rev] *= -1
-            self._db.set_services([service_item])
+            self.db.set_services([service_item])
         else:
             logger.info('Diagnosis: %s is broken.', instance)
 
@@ -47,7 +47,7 @@ class ServiceDoctor(object):
         return self._healthy_instances_with_rev(service_item, rev, None)
 
     def _get_service_with_rev(self, service, rev):
-        service_item = self._db.get_service(service)
+        service_item = self.db.get_service(service)
         if not service_item:
             logger.warn('Service %s not found.', service)
             return None
@@ -82,7 +82,7 @@ class ServiceDoctor(object):
         :return: Running instances.
         """
         running_instances = set()
-        service_statuses = self._db.get_service_status(service, rev, instance)
+        service_statuses = self.db.get_service_status(service, rev, instance)
         for instance, services_status in service_statuses:
             for status in services_status.values():
                 sub_state = status['sub_state']

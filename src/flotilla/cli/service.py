@@ -118,26 +118,36 @@ def get_updates(elb_scheme, dns, health_check, instance_type, provision,
         updates['coreos_version'] = coreos_version
 
     if public_ports:
-        parsed_ports = {}
-        for public_port in public_ports:
-            try:
-                port, proto = public_port.split('-')
-                parsed_ports[int(port)] = proto.upper()
-            except:
-                continue
+        parsed_ports = parse_public_ports(public_ports)
         if parsed_ports:
             updates['public_ports'] = parsed_ports
     if private_ports:
-        parsed_ports = defaultdict(list)
-        for private_port in private_ports:
-            try:
-                port, proto = private_port.split('-')
-                parsed_ports[int(port)].append(proto.upper())
-            except:
-                continue
+        parsed_ports = parse_private_ports(private_ports)
         if parsed_ports:
             updates['private_ports'] = dict(parsed_ports)
     return updates
+
+
+def parse_private_ports(private_ports):
+    parsed_ports = defaultdict(list)
+    for private_port in private_ports:
+        try:
+            port, proto = private_port.split('-')
+            parsed_ports[int(port)].append(proto.upper())
+        except:
+            continue
+    return parsed_ports
+
+
+def parse_public_ports(public_ports):
+    parsed_ports = {}
+    for public_port in public_ports:
+        try:
+            port, proto = public_port.split('-')
+            parsed_ports[int(port)] = proto.upper()
+        except:
+            continue
+    return parsed_ports
 
 
 def configure_service(environment, regions, service_name, updates):

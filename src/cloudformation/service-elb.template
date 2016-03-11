@@ -562,7 +562,6 @@
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
         "Cooldown": "300",
-        "DesiredCapacity": {"Ref": "InstanceMin"},
         "MaxSize": {"Ref": "InstanceMax"},
         "MinSize": {"Ref": "InstanceMin"},
         "HealthCheckGracePeriod": "600",
