@@ -2,6 +2,7 @@ import unittest
 from mock import MagicMock, ANY
 import time
 from flotilla.scheduler.db import FlotillaSchedulerDynamo, INSTANCE_EXPIRY
+from boto.dynamodb2.items import Item
 from boto.dynamodb2.table import Table, BatchTable
 from boto.dynamodb2.exceptions import ItemNotFound
 
@@ -18,6 +19,21 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
         self.services = MagicMock(spec=Table)
         self.stacks = MagicMock(spec=Table)
         self.status = MagicMock(spec=Table)
+        self.service_item = MagicMock(spec=Item)
+        self.service_data = {
+            'service_name': SERVICE,
+            REVISION: 1
+        }
+        self.service_item.__getitem__.side_effect = \
+            self.service_data.__getitem__
+        self.service_item.__setitem__.side_effect = \
+            self.service_data.__setitem__
+        self.service_item.__contains__.side_effect = \
+            self.service_data.__contains__
+        self.service_item.items.side_effect = \
+            self.service_data.items
+        self.service_item.__delitem__.side_effect = \
+            self.service_data.__delitem__
 
         self.db = FlotillaSchedulerDynamo(self.assignments, self.regions,
                                           self.services, self.stacks,
@@ -192,3 +208,19 @@ class TestFlotillaSchedulerDynamo(unittest.TestCase):
                                                               REVISION,
                                                               INSTANCE_ID)}
         self.assertEqual(len(status), 2)
+
+    def test_make_only_revision_not_found(self):
+        self.db.make_only_revision(SERVICE, REVISION)
+
+    def test_make_only_revision_no_changes(self):
+        self.services.get_item.return_value = self.service_item
+        self.db.make_only_revision(SERVICE, REVISION)
+        self.service_item.save.assert_not_called()
+
+    def test_make_only_revision(self):
+        new_hash = REVISION.replace('1', '4')
+        self.service_data[new_hash] = 1
+        self.services.get_item.return_value = self.service_item
+        self.db.make_only_revision(SERVICE, new_hash)
+        self.service_item.save.assert_called_with()
+        self.assertNotIn(REVISION, self.service_item)

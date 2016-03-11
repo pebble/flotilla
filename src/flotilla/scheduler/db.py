@@ -156,3 +156,17 @@ class FlotillaSchedulerDynamo(object):
 
             if parsed:
                 yield instance_id, parsed
+
+    def make_only_revision(self, service_name, rev_hash):
+        service = self.get_service(service_name)
+        if not service or rev_hash not in service:
+            return
+
+        changed = False
+        for k, v in service.items():
+            if len(k) == REV_LENGTH and k != rev_hash:
+                del service[k]
+                changed = True
+
+        if changed:
+            service.save()
